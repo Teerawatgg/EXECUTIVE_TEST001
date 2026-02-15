@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <title>Executive | ผู้ใช้</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/executive.css" />
+  <script src="executive-common.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <style>
+    /* ✅ panel header + print (ตามที่คุณให้ไว้) */
+    .panel-header{
+      display:flex; justify-content:space-between; align-items:flex-start;
+      gap:12px; margin-bottom:12px;
+    }
+    .panel-header h3{ margin:0; }
+    .print-btn{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:10px 16px; border-radius:999px;
+      border:1px solid #dcd6f7; background:#f5f3ff;
+      color:#5b21b6; font-weight:600; cursor:pointer;
+      transition:.2s ease; white-space:nowrap;
+    }
+    .print-btn:hover{ background:#ede9fe; transform:translateY(-1px); }
+    .print-icon{ font-size:16px; }
+
+    @media print{
+      .print-btn, header, .sidebar{ display:none !important; }
+      body{ background:#fff; }
+      .panel{ box-shadow:none; border:none; }
+    }
+
+    /* Dashboard layout */
+    .dash{
+      display:grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap:14px;
+    }
+    .card{
+      border:1px solid #eef0f4;
+      background:#fff;
+      border-radius:14px;
+      padding:14px;
+      box-shadow:0 10px 26px rgba(17,24,39,.06);
+      display:flex; gap:12px; align-items:flex-start;
+      min-height:88px;
+    }
+    .card .ic{
+      width:38px; height:38px; border-radius:10px;
+      display:flex; align-items:center; justify-content:center;
+      background:#f3f4f6;
+      font-size:18px;
+      flex:0 0 auto;
+    }
+    .card .t{ font-weight:900; color:#111827; font-size:12px; }
+    .card .v{ font-weight:900; color:#111827; font-size:18px; margin-top:4px; }
+    .card .s{ font-weight:800; color:#6b7280; font-size:11px; margin-top:2px; }
+
+    .progress{
+      margin-top:10px;
+      width:100%; height:8px; border-radius:999px;
+      background:#eef2f7; overflow:hidden;
+    }
+    .progress > div{ height:100%; width:0%; background:#22c55e; border-radius:999px; }
+
+    .panel-mini{
+      border:1px solid #eef0f4;
+      background:#fff;
+      border-radius:14px;
+      padding:14px;
+      box-shadow:0 10px 26px rgba(17,24,39,.06);
+    }
+    .panel-mini h4{ margin:0 0 10px; font-weight:900; font-size:13px; color:#111827; }
+    .panel-mini .muted{ font-weight:800; color:#6b7280; font-size:11px; margin-top:-6px; margin-bottom:10px; }
+
+    .chartBox{ position:relative; height:240px; }
+    .chartBox.small{ height:210px; }
+
+    .topList .row{
+      display:flex; align-items:center; gap:10px;
+      margin:10px 0;
+    }
+    .topList .rank{
+      width:26px; height:26px; border-radius:999px;
+      background:#ffedd5; color:#9a3412;
+      display:flex; align-items:center; justify-content:center;
+      font-weight:900; font-size:12px;
+    }
+    .topList .name{ font-weight:900; color:#111827; font-size:12px; }
+    .topList .bar{
+      flex:1;
+      height:6px; border-radius:999px; background:#eef2f7; overflow:hidden;
+    }
+    .topList .bar > div{ height:100%; width:0%; background:#f97316; border-radius:999px; }
+    .topList .cnt{ width:64px; text-align:right; font-weight:900; color:#111827; font-size:12px; }
+
+    .seg{
+      display:flex; gap:8px;
+      justify-content:flex-end;
+      margin-top:-6px;
+    }
+    .seg button{
+      border:1px solid #e5e7eb; background:#fff;
+      padding:6px 10px; border-radius:999px;
+      font-weight:900; cursor:pointer; font-size:12px;
+      color:#111827;
+    }
+    .seg button.active{
+      border-color:#22c55e; background:#dcfce7; color:#166534;
+    }
+  </style>
+</head>
+
+<body id="executiveUsers">
+
+  <header class="main-header">
+    <div class="header-top">
+      <div class="brand">
+        <span class="brand-name">ระบบเช่าอุปกรณ์กีฬา</span>
+        <small>Sports Equipment Rental System</small>
+      </div>
+      <div class="staff-zone">
+        <a class="pill-btn" href="profile.html">
+          <span class="pill-ic">👤</span> โปรไฟล์
+        </a>
+      </div>
+    </div>
+
+    <div class="header-bottom">
+      <nav class="main-nav">
+        <a href="index.html" class="nav-item">ภาพรวม</a>
+        <a href="users.html" class="nav-item active">ผู้ใช้</a>
+        <a href="equipment.html" class="nav-item">อุปกรณ์</a>
+        <a href="equipment-status.html" class="nav-item">สถานะอุปกรณ์</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="container">
+    <aside class="sidebar">
+
+      <section class="filter-block">
+        <h4>ตัวกรอง</h4>
+      </section>
+
+      <section class="filter-block">
+        <h4>ปีการศึกษา</h4>
+        <select id="academicYear" class="time-select"></select>
+      </section>
+
+      <section class="filter-block">
+        <h4>ช่วงเวลา</h4>
+        <label><input type="radio" name="range" value="all" checked> ทั้งหมด</label><br/>
+        <label><input type="radio" name="range" value="today"> วันนี้</label><br/>
+        <label><input type="radio" name="range" value="7d"> 7 วันที่ผ่านมา</label><br/>
+        <label><input type="radio" name="range" value="30d"> 30 วันที่ผ่านมา</label><br/>
+        <label><input type="radio" name="range" value="custom"> กำหนดเอง</label>
+
+        <div id="customDateBox" style="display:none;margin-top:10px;">
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <input type="date" id="fromDate" class="time-select" />
+            <input type="date" id="toDate" class="time-select" />
+          </div>
+        </div>
+      </section>
+
+      <section class="filter-block">
+        <h4>คณะ</h4>
+        <div id="facultyList" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </section>
+
+      <section class="filter-block">
+        <h4>ชั้นปี</h4>
+        <div id="studyYearList" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </section>
+
+      <section class="filter-block">
+        <div class="actions">
+          <button class="btn primary" id="btnApply">ใช้ตัวกรอง</button>
+          <button class="btn" id="btnReset">รีเซ็ต</button>
+        </div>
+      </section>
+    </aside>
+
+    <main class="content">
+      <section class="panel">
+
+        <div class="panel-header">
+          <div>
+            <h3>ผู้ใช้</h3>
+            <div class="muted">วิเคราะห์การเข้าใช้งานแยกตามคณะและช่วงเวลา</div>
+          </div>
+          <button class="print-btn" onclick="window.print()">
+            <span class="print-icon">🖨️</span> พิมพ์
+          </button>
+        </div>
+
+        <div class="dash">
+
+          <!-- KPI cards -->
+          <div class="card" style="grid-column: span 4;">
+            <div class="ic">👥</div>
+            <div style="flex:1;">
+              <div class="t">จำนวนการเข้าใช้</div>
+              <div class="v" id="kpiTotalUsage">-</div>
+              <div class="s">ครั้ง</div>
+            </div>
+          </div>
+
+          <div class="card" style="grid-column: span 4;">
+            <div class="ic" style="background:#fff7ed;">📈</div>
+            <div style="flex:1;">
+              <div class="t">คณะใช้งานมากที่สุด</div>
+              <div class="v" id="kpiTopFacultyName">-</div>
+              <div class="s"><span id="kpiTopFacultyCount">-</span> ครั้ง</div>
+            </div>
+          </div>
+
+          <div class="card" style="grid-column: span 4;">
+            <div class="ic" style="background:#ecfdf5;">📊</div>
+            <div style="flex:1;">
+              <div class="t">อัตราการใช้</div>
+              <div class="v"><span id="kpiUsageRate">-</span>%</div>
+              <div class="progress"><div id="kpiUsageBar"></div></div>
+            </div>
+          </div>
+
+          <!-- Charts row -->
+          <div class="panel-mini" style="grid-column: span 6;">
+            <h4>การยืมแยกตามคณะ</h4>
+            <div class="muted">จำนวนการเข้าใช้งาน (ตามตัวกรอง)</div>
+            <div class="chartBox"><canvas id="chartFaculty"></canvas></div>
+          </div>
+
+          <div class="panel-mini" style="grid-column: span 6;">
+            <h4>การยืมอุปกรณ์แยกตามชั้นปี</h4>
+            <div class="muted">จำนวนการเข้าใช้งาน (ตามตัวกรอง)</div>
+            <div class="chartBox"><canvas id="chartStudyYear"></canvas></div>
+          </div>
+
+          <!-- Bottom row -->
+          <div class="panel-mini" style="grid-column: span 6;">
+            <h4>อุปกรณ์ยอดนิยม Top 5</h4>
+            <div class="muted">อุปกรณ์ที่ถูกยืมมากที่สุด (ตามตัวกรอง)</div>
+            <div class="topList" id="topEquipmentList"></div>
+          </div>
+
+          <div class="panel-mini" style="grid-column: span 6;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+              <div>
+                <h4 style="margin:0;">ช่วงเวลาการยืมสูงสุด</h4>
+                <div class="muted">เลือกดู “รายวัน” หรือ “ช่วงเวลาใช้งาน”</div>
+              </div>
+              <div class="seg">
+                <button id="btnDaily" type="button">รายวัน</button>
+                <button id="btnPeak" type="button" class="active">ช่วงเวลาใช้งาน</button>
+              </div>
+            </div>
+            <div class="chartBox small"><canvas id="chartPeak"></canvas></div>
+          </div>
+
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="users.js"></script>
+</body>
+</html>
