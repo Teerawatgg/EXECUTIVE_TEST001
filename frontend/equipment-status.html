@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="th">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -7,7 +8,8 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;700;800;900&display=swap"
+    rel="stylesheet">
 
   <!-- ✅ ถูก path แน่นอนตามโฟลเดอร์คุณ -->
   <link rel="stylesheet" href="./css/executive.css?v=1">
@@ -16,75 +18,113 @@
 
   <!-- ✅ กันเคส “รูปที่ 4” กลายเป็นตัวหนังสือดิบ ๆ -->
   <style>
-  *{box-sizing:border-box}
-  body{margin:0;font-family:"Noto Sans Thai",sans-serif;background:#f7f8fb}
+    * {
+      box-sizing: border-box
+    }
 
-  /* ✅ FIX: บังคับให้ topbar/tabs แสดงผลและไม่เพี้ยน */
-  .exec-topbar{
-    display:flex !important;
-    align-items:center !important;
-    justify-content:space-between !important;
-    padding:18px 22px !important;
-    background:#fff !important;
-    border-bottom:1px solid #eef0f4 !important;
-    position:sticky; top:0; z-index:50; /* ไม่ให้หลุด */
-  }
-  .exec-title{font-weight:900;font-size:20px;color:#111827}
-  .exec-sub{margin-top:4px;color:#6b7280;font-weight:800;font-size:13px}
+    body {
+      margin: 0;
+      font-family: "Noto Sans Thai", sans-serif;
+      background: #f7f8fb
+    }
 
-  .exec-profile{
-    position:static !important;  /* ✅ กัน rule fixed/absolute จาก executive.css */
-    inset:auto !important;
-    display:flex !important;
-    align-items:center !important;
-    gap:10px !important;
-    background:#fff !important;
-    border:1px solid #eef0f4 !important;
-    border-radius:999px !important;
-    padding:10px 14px !important;
-    text-decoration:none !important;
-    color:#111827 !important;
-    font-weight:900 !important;
-    box-shadow:0 10px 26px rgba(17,24,39,.06) !important;
-  }
-  .exec-avatar{
-    width:34px;height:34px;border-radius:999px;
-    display:flex;align-items:center;justify-content:center;
-    background:#f3f4f6;border:1px solid #e5e7eb
-  }
+    /* ✅ FIX: บังคับให้ topbar/tabs แสดงผลและไม่เพี้ยน */
+    .exec-topbar {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      padding: 18px 22px !important;
+      background: #fff !important;
+      border-bottom: 1px solid #eef0f4 !important;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      /* ไม่ให้หลุด */
+    }
 
-  .exec-tabs{
-    display:flex !important;
-    align-items:center !important;
-    gap:14px !important;
-    padding:12px 22px !important;
-    background:#fff !important;
-    border-bottom:1px solid #eef0f4 !important;
-    position:sticky; top:72px; z-index:49; /* ติดใต้ topbar */
-  }
-  .exec-tabs .tab{
-    padding:10px 14px;border-radius:12px;
-    text-decoration:none !important;
-    color:#111827 !important;
-    font-weight:900 !important;
-  }
-  .exec-tabs .tab.active{background:#fff7ed;border:1px solid #fed7aa;color:#f97316 !important}
+    .exec-title {
+      font-weight: 900;
+      font-size: 20px;
+      color: #111827
+    }
 
-  /* ✅ FIX: panel-header ไม่ให้ลอย/เว้นช่องว่างประหลาด */
-  .panel-header{
-    margin:18px 22px 0 !important;
-    display:flex !important;
-    align-items:center !important;
-    justify-content:space-between !important;
-    gap:12px !important;
-  }
+    .exec-sub {
+      margin-top: 4px;
+      color: #6b7280;
+      font-weight: 800;
+      font-size: 13px
+    }
 
-  /* ✅ FIX: ปุ่มพิมพ์ให้ชิดขวาในบรรทัดเดียว */
-  .print-btn{
-    margin:0 !important;
-    white-space:nowrap !important;
-  }
-</style>
+    .exec-profile {
+      position: static !important;
+      /* ✅ กัน rule fixed/absolute จาก executive.css */
+      inset: auto !important;
+      display: flex !important;
+      align-items: center !important;
+      gap: 10px !important;
+      background: #fff !important;
+      border: 1px solid #eef0f4 !important;
+      border-radius: 999px !important;
+      padding: 10px 14px !important;
+      text-decoration: none !important;
+      color: #111827 !important;
+      font-weight: 900 !important;
+      box-shadow: 0 10px 26px rgba(17, 24, 39, .06) !important;
+    }
+
+    .exec-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb
+    }
+
+    .exec-tabs {
+      display: flex !important;
+      align-items: center !important;
+      gap: 14px !important;
+      padding: 12px 22px !important;
+      background: #fff !important;
+      border-bottom: 1px solid #eef0f4 !important;
+      position: sticky;
+      top: 72px;
+      z-index: 49;
+      /* ติดใต้ topbar */
+    }
+
+    .exec-tabs .tab {
+      padding: 10px 14px;
+      border-radius: 12px;
+      text-decoration: none !important;
+      color: #111827 !important;
+      font-weight: 900 !important;
+    }
+
+    .exec-tabs .tab.active {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      color: #f97316 !important
+    }
+
+    /* ✅ FIX: panel-header ไม่ให้ลอย/เว้นช่องว่างประหลาด */
+    .panel-header {
+      margin: 18px 22px 0 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 12px !important;
+    }
+
+    /* ✅ FIX: ปุ่มพิมพ์ให้ชิดขวาในบรรทัดเดียว */
+    .print-btn {
+      margin: 0 !important;
+      white-space: nowrap !important;
+    }
+  </style>
 </head>
 
 <body>
@@ -95,9 +135,9 @@
       <div class="exec-title">ระบบเช่าอุปกรณ์กีฬา</div>
       <div class="exec-sub">Sports Equipment Rental System</div>
     </div>
-    <a class="exec-profile" >
+    <a class="exec-profile" href="./profile.html">
       <span class="exec-avatar">👤</span>
-      <span >โปรไฟล์</span>
+      <span>โปรไฟล์</span>
     </a>
   </header>
 
@@ -145,11 +185,36 @@
     <main class="equip-main">
 
       <div class="equip-cards">
-        <div class="card-mini"><div><div class="t">อุปกรณ์ทั้งหมด</div><div class="v" id="cTotal">-</div></div></div>
-        <div class="card-mini"><div><div class="t">พร้อมใช้งาน</div><div class="v" id="cReady">-</div></div></div>
-        <div class="card-mini"><div><div class="t">เสื่อมสภาพ</div><div class="v" id="cWorn">-</div></div></div>
-        <div class="card-mini"><div><div class="t">ชำรุด</div><div class="v" id="cBroken">-</div></div></div>
-        <div class="card-mini"><div><div class="t">กำลังซ่อมแซม</div><div class="v" id="cMaint">-</div></div></div>
+        <div class="card-mini">
+          <div>
+            <div class="t">อุปกรณ์ทั้งหมด</div>
+            <div class="v" id="cTotal">-</div>
+          </div>
+        </div>
+        <div class="card-mini">
+          <div>
+            <div class="t">พร้อมใช้งาน</div>
+            <div class="v" id="cReady">-</div>
+          </div>
+        </div>
+        <div class="card-mini">
+          <div>
+            <div class="t">เสื่อมสภาพ</div>
+            <div class="v" id="cWorn">-</div>
+          </div>
+        </div>
+        <div class="card-mini">
+          <div>
+            <div class="t">ชำรุด</div>
+            <div class="v" id="cBroken">-</div>
+          </div>
+        </div>
+        <div class="card-mini">
+          <div>
+            <div class="t">กำลังซ่อมแซม</div>
+            <div class="v" id="cMaint">-</div>
+          </div>
+        </div>
       </div>
 
       <div class="equip-grid2">
@@ -177,4 +242,5 @@
   <!-- ✅ IMPORTANT: ใช้ชื่อไฟล์จริงของคุณ (มีขีดกลาง) -->
   <script src="./equipment-status.js?v=1"></script>
 </body>
+
 </html>

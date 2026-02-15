@@ -8,7 +8,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/executive.css" />
   <script src="executive-common.js"></script>
-
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
   <style>
@@ -61,6 +60,7 @@
     .list-radio{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
     .item-radio{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #eef0f4;border-radius:12px;background:#fff;cursor:pointer;font-weight:900;}
     .item-radio:hover{background:#f9fafb;}
+    .item-radio small{margin-left:auto;color:#6b7280;font-weight:900;}
 
     .tableWrap{overflow:auto;}
     table.mini{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;}
@@ -115,17 +115,7 @@
 
       <section class="filter-block">
         <h4>ปีการศึกษา</h4>
-        <select id="academicYear" class="time-select"></select>
-      </section>
-
-      <!-- <section class="filter-block">
-        <h4>เพศ</h4>
-        <select id="genderSelect" class="time-select">
-          <option value="ALL">ทั้งหมด</option>
-          <option value="M">ชาย</option>
-          <option value="F">หญิง</option>
-          <option value="O">อื่นๆ</option>
-        </select> -->
+        <select id="academicYear" class="time-select"><option value="ALL">ทั้งหมด</option></select>
       </section>
 
       <section class="filter-block">
@@ -146,7 +136,7 @@
         </div>
       </section>
 
-      <!-- <section class="filter-block">
+      <section class="filter-block">
         <h4>คณะ</h4>
         <div id="facultyList" class="list-radio"></div>
       </section>
@@ -154,7 +144,7 @@
       <section class="filter-block">
         <h4>ชั้นปี</h4>
         <div id="studyYearList" class="list-radio"></div>
-      </section> -->
+      </section>
 
       <section class="filter-block">
         <div class="actions">
@@ -180,7 +170,7 @@
 
         <div class="dash">
 
-          <!-- ✅ KPI 3 ใบเดิม -->
+          <!-- KPI -->
           <div class="card" style="grid-column: span 4;">
             <div class="ic">👥</div>
             <div style="flex:1;">
@@ -208,7 +198,7 @@
             </div>
           </div>
 
-          <!-- Charts เดิม -->
+          <!-- Charts -->
           <div class="panel-mini" style="grid-column: span 6;">
             <h4>การใช้งานแยกตามคณะ</h4>
             <div class="muted">จำนวนการเข้าใช้งาน (ตามตัวกรอง)</div>
@@ -221,7 +211,7 @@
             <div class="chartBox"><canvas id="chartStudyYear"></canvas></div>
           </div>
 
-          <!-- ✅ NEW: ระดับสมาชิก -->
+          <!-- Member tier table -->
           <div class="panel-mini" style="grid-column: span 6;">
             <h4>ระดับสมาชิก: จำนวนการจอง & ยอดใช้จ่ายรวม</h4>
             <div class="muted">ลูกค้าแต่ละระดับสมาชิกมีการจองทั้งหมดกี่ครั้ง และมียอดใช้จ่ายรวมเท่าใด</div>
@@ -241,14 +231,14 @@
             </div>
           </div>
 
-          <!-- ✅ NEW: คูปองยอดนิยมในนักศึกษา -->
+          <!-- Student coupon top -->
           <div class="panel-mini" style="grid-column: span 6;">
             <h4>คูปองยอดนิยมในกลุ่มนักศึกษา</h4>
             <div class="muted">คูปองใดถูกนำมาใช้งานมากที่สุด (เฉพาะกลุ่มนักศึกษา)</div>
             <div id="studentCouponTop" class="topList"></div>
           </div>
 
-          <!-- ✅ NEW: ช่องทางชำระเงิน -->
+          <!-- Payment method summary -->
           <div class="panel-mini" style="grid-column: span 6;">
             <h4>ช่องทางชำระเงินของผู้ใช้</h4>
             <div class="muted">จำนวนครั้งและยอดรวมตามช่องทางชำระเงิน</div>
@@ -268,13 +258,40 @@
             </div>
           </div>
 
-          <!-- เดิม -->
+          <!-- Reviews -->
+          <div class="panel-mini" style="grid-column: span 6;">
+            <h4>รีวิวจากผู้ใช้</h4>
+            <div class="muted">สรุปคะแนนและรายการรีวิวล่าสุด</div>
+
+            <div class="chipRow" style="margin:0 0 10px;">
+              <div class="chip gray"><span class="k">จำนวนรีวิว:</span> <span class="v" id="rvTotal">0</span></div>
+              <div class="chip orange"><span class="k">คะแนนเฉลี่ย:</span> <span class="v" id="rvAvg">0.0</span></div>
+            </div>
+
+            <div class="tableWrap">
+              <table class="mini">
+                <thead>
+                  <tr>
+                    <th>วันที่</th>
+                    <th>ข้อความรีวิว</th>
+                    <th class="tr">คะแนน</th>
+                  </tr>
+                </thead>
+                <tbody id="recentReviewTbody">
+                  <tr><td colspan="3" style="color:#6b7280;font-weight:900;">กำลังโหลด...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Top equipment -->
           <div class="panel-mini" style="grid-column: span 6;">
             <h4>อุปกรณ์ยอดนิยม Top 5</h4>
             <div class="muted">อุปกรณ์ที่ถูกยืมมากที่สุด (ตามตัวกรอง)</div>
             <div class="topList" id="topEquipmentList"></div>
           </div>
 
+          <!-- Peak/daily -->
           <div class="panel-mini" style="grid-column: span 6;">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
               <div>

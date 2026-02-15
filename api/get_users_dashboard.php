@@ -16,7 +16,7 @@ function qcsv($key) {
 }
 
 function dateWhereUsersSQL($col, &$types, &$vals) {
-  $range = q("range", "all");
+  $range = q("range", "all");    // all | today | 7d | 30d | custom
   $from  = q("from", "");
   $to    = q("to", "");
 
@@ -43,7 +43,6 @@ function hasTable($conn, $table) {
   $st->close();
   return $ok;
 }
-
 function hasColumn($conn, $table, $col) {
   $sql = "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1";
   $st = $conn->prepare($sql);
@@ -54,18 +53,41 @@ function hasColumn($conn, $table, $col) {
   $st->close();
   return $ok;
 }
-
 function studentWhereSQL() {
-  // รองรับทั้งค่าอังกฤษ/ไทยที่พบบ่อย
-  return "(UPPER(cu.customer_type) = 'STUDENT' OR cu.customer_type LIKE '%นักศึกษา%')";
+  return "(UPPER(cu.customer_type) = 'STUDENT' OR LOWER(cu.customer_type) = 'student' OR cu.customer_type LIKE '%นักศึกษา%')";
 }
 
 try {
   $types = ""; $vals = [];
   $where = [];
 
-  // ใช้ pickup_time เป็นเวลาอ้างอิง
+  // ===== Filters =====
   $where[] = dateWhereUsersSQL("b.pickup_time", $types, $vals);
+
+  $branch_id = q("branch_id", "ALL");
+  if ($branch_id !== "ALL" && $branch_id !== "") {
+    $where[] = "b.branch_id = ?";
+    addParam($types, $vals, "s", $branch_id);
+  }
+
+  // region รองรับทั้ง region_id หรือ region_name
+  $region = q("region", "ALL");       // อาจเป็นชื่อ เช่น "ภาคเหนือ"
+  $region_id = q("region_id", "");    // อาจเป็นเลข เช่น 1
+  if (($region !== "ALL" && $region !== "") || $region_id !== "") {
+    if ($region_id !== "" && preg_match('/^\d+$/', $region_id)) {
+      $where[] = "rg.region_id = ?";
+      addParam($types, $vals, "i", (int)$region_id);
+    } else if ($region !== "" && $region !== "ALL") {
+      // ถ้าส่งมาเป็นตัวเลขก็จับเป็น region_id ให้
+      if (preg_match('/^\d+$/', $region)) {
+        $where[] = "rg.region_id = ?";
+        addParam($types, $vals, "i", (int)$region);
+      } else {
+        $where[] = "rg.region_name = ?";
+        addParam($types, $vals, "s", $region);
+      }
+    }
+  }
 
   $academic_year = q("academic_year", "ALL");
   if ($academic_year !== "ALL" && $academic_year !== "") {
@@ -73,15 +95,17 @@ try {
     addParam($types, $vals, "i", (int)$academic_year);
   }
 
-  // faculties รับได้ทั้ง "id" หรือ "ชื่อคณะ"
-  $faculties = qcsv("faculties");
+  $faculties = qcsv("faculties"); // ส่งเป็น id หรือชื่อก็ได้
   $facultyIsAllNumeric = true;
   foreach ($faculties as $f) {
     if (!preg_match('/^\d+$/', $f)) { $facultyIsAllNumeric = false; break; }
   }
   if (count($faculties)) {
     $ph = [];
-    foreach ($faculties as $f) { $ph[] = "?"; addParam($types,$vals, $facultyIsAllNumeric ? "i" : "s", $facultyIsAllNumeric ? (int)$f : $f); }
+    foreach ($faculties as $f) {
+      $ph[] = "?";
+      addParam($types, $vals, $facultyIsAllNumeric ? "i" : "s", $facultyIsAllNumeric ? (int)$f : $f);
+    }
     $where[] = $facultyIsAllNumeric
       ? "cu.faculty_id IN (" . implode(",", $ph) . ")"
       : "f.name IN (" . implode(",", $ph) . ")";
@@ -96,36 +120,44 @@ try {
 
   $whereSql = implode(" AND ", $where);
 
-  // ---- META (ปีการศึกษา) ----
+  // base joins ให้ region filter ใช้ได้ทุก query
+  $baseJoin = "
+    FROM bookings b
+    INNER JOIN customers cu ON cu.customer_id = b.customer_id
+    LEFT JOIN faculty f ON f.id = cu.faculty_id
+    LEFT JOIN branches br ON br.branch_id = b.branch_id
+    LEFT JOIN provinces pv ON pv.province_id = br.province_id
+    LEFT JOIN region rg ON rg.region_id = pv.region_id
+  ";
+
+  // ===== META =====
   $metaYears = [];
   $rsY = $conn->query("
     SELECT DISTINCT (YEAR(pickup_time)+543) AS y
     FROM bookings
     WHERE pickup_time IS NOT NULL
     ORDER BY y DESC
-    LIMIT 10
+    LIMIT 20
   ");
   while ($r = $rsY->fetch_assoc()) $metaYears[] = (int)$r["y"];
 
-  // ---- META (คณะ) ----
   $metaFac = [];
-  $rsF = $conn->query("
-    SELECT id, name
-    FROM faculty
-    ORDER BY name ASC
-  ");
+  $rsF = $conn->query("SELECT id, name FROM faculty ORDER BY name ASC");
   while ($r = $rsF->fetch_assoc()) $metaFac[] = ["id" => (int)$r["id"], "name" => $r["name"]];
 
-  // ---- KPI ----
-  $sqlTotal = "
-    SELECT COUNT(*) AS total_usage,
-           COUNT(DISTINCT b.customer_id) AS active_users
-    FROM bookings b
-    INNER JOIN customers cu ON cu.customer_id = b.customer_id
-    LEFT JOIN faculty f ON f.id = cu.faculty_id
+  $metaSY = [];
+  $rsSY = $conn->query("SELECT DISTINCT study_year FROM customers WHERE study_year IS NOT NULL ORDER BY study_year ASC");
+  while ($r = $rsSY->fetch_assoc()) $metaSY[] = (int)$r["study_year"];
+
+  // ===== KPI =====
+  $sqlKpi = "
+    SELECT
+      COUNT(*) AS total_usage,
+      COUNT(DISTINCT b.customer_id) AS active_users
+    $baseJoin
     WHERE $whereSql
   ";
-  $st = $conn->prepare($sqlTotal);
+  $st = $conn->prepare($sqlKpi);
   stmtBindDynamic($st, $types, $vals);
   $st->execute();
   $k1 = fetchOne($st);
@@ -134,7 +166,7 @@ try {
   $total_usage  = (int)($k1["total_usage"] ?? 0);
   $active_users = (int)($k1["active_users"] ?? 0);
 
-  // denominator: total users ภายใต้ filter คณะ/ชั้นปี (ไม่ผูกเวลา)
+  // total_users (ตาม filter คณะ/ชั้นปี แต่ไม่ผูกเวลา)
   $typesU=""; $valsU=[]; $wU=["1=1"];
   if (count($faculties)) {
     $ph=[];
@@ -158,19 +190,17 @@ try {
   $total_users = (int)($denRow["total_users"] ?? 0);
   $usage_rate = ($total_users > 0) ? ($active_users * 100.0 / $total_users) : 0.0;
 
-  // ---- FACULTY BAR ----
+  // ===== Charts: by_faculty / by_study_year =====
   $sqlFaculty = "
     SELECT f.name AS faculty, COUNT(*) AS cnt
-    FROM bookings b
-    INNER JOIN customers cu ON cu.customer_id = b.customer_id
-    LEFT JOIN faculty f ON f.id = cu.faculty_id
+    $baseJoin
     WHERE $whereSql
       AND f.name IS NOT NULL AND TRIM(f.name) <> ''
     GROUP BY f.name
     ORDER BY cnt DESC
   ";
   $st = $conn->prepare($sqlFaculty);
-  stmtBindDynamic($st,$types,$vals);
+  stmtBindDynamic($st, $types, $vals);
   $st->execute();
   $facultyRows = fetchAll($st);
   $st->close();
@@ -181,45 +211,44 @@ try {
     $top_faculty["count"] = (int)($facultyRows[0]["cnt"] ?? 0);
   }
 
-  // ---- STUDY YEAR ----
   $sqlSY = "
     SELECT cu.study_year AS study_year, COUNT(*) AS cnt
-    FROM bookings b
-    INNER JOIN customers cu ON cu.customer_id = b.customer_id
-    LEFT JOIN faculty f ON f.id = cu.faculty_id
+    $baseJoin
     WHERE $whereSql
       AND cu.study_year IS NOT NULL
     GROUP BY cu.study_year
     ORDER BY cu.study_year ASC
   ";
   $st = $conn->prepare($sqlSY);
-  stmtBindDynamic($st,$types,$vals);
+  stmtBindDynamic($st, $types, $vals);
   $st->execute();
   $syRows = fetchAll($st);
   $st->close();
 
-  // ---- TOP EQUIPMENT ----
+  // ===== Top Equipment =====
   $sqlEq = "
     SELECT em.name AS name, COALESCE(SUM(d.quantity),0) AS cnt
     FROM booking_details d
     INNER JOIN bookings b ON b.booking_id = d.booking_id
     INNER JOIN customers cu ON cu.customer_id = b.customer_id
     LEFT JOIN faculty f ON f.id = cu.faculty_id
-    LEFT JOIN equipment_master em ON em.equipment_id = d.equipment_id
+    LEFT JOIN branches br ON br.branch_id = b.branch_id
+    LEFT JOIN provinces pv ON pv.province_id = br.province_id
+    LEFT JOIN region rg ON rg.region_id = pv.region_id
+    INNER JOIN equipment_master em ON em.equipment_id = d.equipment_id
     WHERE $whereSql
       AND (d.item_type = 'Equipment' OR d.item_type = 'EQUIPMENT')
-      AND em.name IS NOT NULL
     GROUP BY em.name
     ORDER BY cnt DESC
     LIMIT 5
   ";
   $st = $conn->prepare($sqlEq);
-  stmtBindDynamic($st,$types,$vals);
+  stmtBindDynamic($st, $types, $vals);
   $st->execute();
   $eqRows = fetchAll($st);
   $st->close();
 
-  // ---- PEAK TIME ----
+  // ===== Peak Time =====
   $sqlPeak = "
     SELECT
       CASE
@@ -232,36 +261,32 @@ try {
         ELSE 'อื่นๆ'
       END AS tbin,
       COUNT(*) AS cnt
-    FROM bookings b
-    INNER JOIN customers cu ON cu.customer_id = b.customer_id
-    LEFT JOIN faculty f ON f.id = cu.faculty_id
+    $baseJoin
     WHERE $whereSql
     GROUP BY tbin
     ORDER BY FIELD(tbin,'08:00-10:00','10:00-12:00','12:00-14:00','14:00-16:00','16:00-18:00','18:00-20:00','อื่นๆ')
   ";
   $st = $conn->prepare($sqlPeak);
-  stmtBindDynamic($st,$types,$vals);
+  stmtBindDynamic($st, $types, $vals);
   $st->execute();
   $peakRows = fetchAll($st);
   $st->close();
 
-  // ---- DAILY (Mon-Sun) ----
+  // ===== Daily Usage =====
   $sqlDaily = "
     SELECT WEEKDAY(b.pickup_time) AS wd, COUNT(*) AS cnt
-    FROM bookings b
-    INNER JOIN customers cu ON cu.customer_id = b.customer_id
-    LEFT JOIN faculty f ON f.id = cu.faculty_id
+    $baseJoin
     WHERE $whereSql
     GROUP BY WEEKDAY(b.pickup_time)
     ORDER BY wd ASC
   ";
   $st = $conn->prepare($sqlDaily);
-  stmtBindDynamic($st,$types,$vals);
+  stmtBindDynamic($st, $types, $vals);
   $st->execute();
   $dailyRows = fetchAll($st);
   $st->close();
 
-  $wdMap = ["จ.","อ.","พ.","พฤ.","ศ.","ส.","อา."]; // 0=Mon
+  $wdMap = ["จ.","อ.","พ.","พฤ.","ศ.","ส.","อา."];
   $daily = array_fill(0, 7, 0);
   foreach ($dailyRows as $r) {
     $i = (int)$r["wd"];
@@ -269,178 +294,167 @@ try {
   }
 
   // =========================================================
-  // ✅ Executive Insights for Users
-  // 1) membership_summary: bookings + spend by member_level
-  // 2) student_coupon_top: most used coupon among students
-  // 3) payment_method_summary: count + spend by payment method
+  // Executive insights that your UI needs
   // =========================================================
 
-  // ---- 1) MEMBERSHIP SUMMARY ----
+  // 1) Member tier summary (ใช้ customers.member_level)
   $membershipSummary = [];
-  try {
-    if (hasColumn($conn, 'customers', 'member_level') && hasTable($conn, 'payments') && hasTable($conn, 'payment_status')) {
-      $sqlMem = "
-        SELECT
-          COALESCE(NULLIF(TRIM(cu.member_level),''),'ไม่ระบุ') AS tier,
-          COUNT(DISTINCT b.booking_id) AS bookings,
-          COALESCE(SUM(pay.amount - COALESCE(pay.refund_amount,0)),0) AS spend
-        FROM bookings b
-        INNER JOIN customers cu ON cu.customer_id = b.customer_id
-        LEFT JOIN faculty f ON f.id = cu.faculty_id
-        LEFT JOIN payments pay ON pay.booking_id = b.booking_id
-        LEFT JOIN payment_status ps ON ps.id = pay.payment_status_id
-        WHERE $whereSql
-          AND ps.code IN ('PAID','REFUNDED')
-        GROUP BY tier
-        ORDER BY spend DESC, bookings DESC
-      ";
-      $st = $conn->prepare($sqlMem);
-      stmtBindDynamic($st,$types,$vals);
-      $st->execute();
-      $rows = fetchAll($st);
-      $st->close();
+  if (hasColumn($conn, 'customers', 'member_level')) {
+    $sqlMem = "
+      SELECT
+        COALESCE(NULLIF(TRIM(cu.member_level),''),'ไม่ระบุ') AS tier,
+        COUNT(*) AS bookings,
+        COALESCE(SUM(b.net_amount),0) AS spend
+      $baseJoin
+      WHERE $whereSql
+      GROUP BY tier
+      ORDER BY spend DESC, bookings DESC
+    ";
+    $st = $conn->prepare($sqlMem);
+    stmtBindDynamic($st, $types, $vals);
+    $st->execute();
+    $rows = fetchAll($st);
+    $st->close();
 
-      $membershipSummary = array_map(fn($r)=>[
-        "tier" => $r["tier"],
-        "bookings" => (int)($r["bookings"] ?? 0),
-        "spend" => (float)($r["spend"] ?? 0),
-      ], $rows);
-    }
-  } catch (Throwable $_) {
-    $membershipSummary = [];
+    $membershipSummary = array_map(fn($r)=>[
+      "tier" => $r["tier"],
+      "bookings" => (int)($r["bookings"] ?? 0),
+      "spend" => (float)($r["spend"] ?? 0),
+    ], $rows);
   }
 
-  // ---- 2) STUDENT COUPON TOP ----
+  // 2) Student coupon top (ใช้ bookings.coupon_code + bookings.discount_amount)
   $studentCouponTop = [];
-  try {
-    $hasBookingCoupons = hasTable($conn, 'booking_coupons');
-    $hasCouponsTable   = hasTable($conn, 'coupons');
-    $hasCouponCodeCol  = hasColumn($conn, 'bookings', 'coupon_code');
-    $hasCouponDiscCol  = hasColumn($conn, 'bookings', 'coupon_discount');
+  if (hasColumn($conn,'bookings','coupon_code') && hasColumn($conn,'bookings','discount_amount') && hasTable($conn,'coupons')) {
+    $sqlCup = "
+      SELECT
+        b.coupon_code AS coupon_code,
+        c.name AS coupon_name,
+        COUNT(*) AS cnt,
+        COALESCE(SUM(COALESCE(b.discount_amount,0)),0) AS discount_total
+      $baseJoin
+      LEFT JOIN coupons c ON c.code = b.coupon_code
+      WHERE $whereSql
+        AND " . studentWhereSQL() . "
+        AND b.coupon_code IS NOT NULL AND TRIM(b.coupon_code) <> ''
+      GROUP BY b.coupon_code, c.name
+      ORDER BY cnt DESC
+      LIMIT 5
+    ";
+    $st = $conn->prepare($sqlCup);
+    stmtBindDynamic($st, $types, $vals);
+    $st->execute();
+    $rows = fetchAll($st);
+    $st->close();
 
-    if ($hasBookingCoupons && $hasCouponsTable) {
-      // คาด: booking_coupons(booking_id,coupon_id,discount_amount), coupons(coupon_id,code,name)
-      $sqlCup = "
-        SELECT
-          c.code AS coupon_code,
-          c.name AS coupon_name,
-          COUNT(*) AS cnt,
-          COALESCE(SUM(COALESCE(bc.discount_amount,0)),0) AS discount_total
-        FROM booking_coupons bc
-        INNER JOIN coupons c ON c.coupon_id = bc.coupon_id
-        INNER JOIN bookings b ON b.booking_id = bc.booking_id
-        INNER JOIN customers cu ON cu.customer_id = b.customer_id
-        LEFT JOIN faculty f ON f.id = cu.faculty_id
-        WHERE $whereSql
-          AND " . studentWhereSQL() . "
-        GROUP BY c.code, c.name
-        ORDER BY cnt DESC
-        LIMIT 5
-      ";
-      $st = $conn->prepare($sqlCup);
-      stmtBindDynamic($st,$types,$vals);
-      $st->execute();
-      $rows = fetchAll($st);
-      $st->close();
-
-      $studentCouponTop = array_map(fn($r)=>[
-        "coupon_code" => $r["coupon_code"],
-        "coupon_name" => $r["coupon_name"],
-        "count" => (int)($r["cnt"] ?? 0),
-        "discount_total" => (float)($r["discount_total"] ?? 0),
-      ], $rows);
-
-    } else if ($hasCouponCodeCol) {
-      // ถ้าเก็บ coupon_code ไว้ใน bookings
-      $joinCoupons = "";
-      $selName = "NULL";
-      if ($hasCouponsTable && hasColumn($conn,'coupons','code')) {
-        $joinCoupons = " LEFT JOIN coupons c ON c.code = b.coupon_code ";
-        $selName = "c.name";
-      }
-
-      $sqlCup2 = "
-        SELECT
-          b.coupon_code AS coupon_code,
-          $selName AS coupon_name,
-          COUNT(*) AS cnt,
-          COALESCE(SUM(" . ($hasCouponDiscCol ? "COALESCE(b.coupon_discount,0)" : "0") . "),0) AS discount_total
-        FROM bookings b
-        INNER JOIN customers cu ON cu.customer_id = b.customer_id
-        LEFT JOIN faculty f ON f.id = cu.faculty_id
-        $joinCoupons
-        WHERE $whereSql
-          AND " . studentWhereSQL() . "
-          AND b.coupon_code IS NOT NULL AND TRIM(b.coupon_code) <> ''
-        GROUP BY b.coupon_code, coupon_name
-        ORDER BY cnt DESC
-        LIMIT 5
-      ";
-      $st = $conn->prepare($sqlCup2);
-      stmtBindDynamic($st,$types,$vals);
-      $st->execute();
-      $rows = fetchAll($st);
-      $st->close();
-
-      $studentCouponTop = array_map(fn($r)=>[
-        "coupon_code" => $r["coupon_code"],
-        "coupon_name" => $r["coupon_name"],
-        "count" => (int)($r["cnt"] ?? 0),
-        "discount_total" => (float)($r["discount_total"] ?? 0),
-      ], $rows);
-    }
-  } catch (Throwable $_) {
-    $studentCouponTop = [];
+    $studentCouponTop = array_map(fn($r)=>[
+      "coupon_code" => $r["coupon_code"],
+      "coupon_name" => $r["coupon_name"],
+      "count" => (int)($r["cnt"] ?? 0),
+      "discount_total" => (float)($r["discount_total"] ?? 0),
+    ], $rows);
   }
 
-  // ---- 3) PAYMENT METHOD SUMMARY ----
+  // 3) Payment method summary (ใช้ payments.amount)
   $paymentMethodSummary = [];
-  try {
-    if (hasTable($conn, 'payments') && hasTable($conn, 'payment_methods') && hasTable($conn, 'payment_status')) {
-      $sqlPay = "
-        SELECT
-          pm.code AS method,
-          COALESCE(pm.name_th, pm.name_en, pm.code) AS method_name,
-          COUNT(*) AS cnt,
-          COALESCE(SUM(pay.amount - COALESCE(pay.refund_amount,0)),0) AS amount
-        FROM payments pay
-        JOIN payment_methods pm ON pm.method_id = pay.method_id
-        JOIN payment_status ps ON ps.id = pay.payment_status_id
-        JOIN bookings b ON b.booking_id = pay.booking_id
-        INNER JOIN customers cu ON cu.customer_id = b.customer_id
-        LEFT JOIN faculty f ON f.id = cu.faculty_id
-        WHERE $whereSql
-          AND ps.code IN ('PAID','REFUNDED')
-        GROUP BY pm.code, pm.name_th, pm.name_en
-        ORDER BY amount DESC
-      ";
-      $st = $conn->prepare($sqlPay);
-      stmtBindDynamic($st,$types,$vals);
-      $st->execute();
-      $rows = fetchAll($st);
-      $st->close();
+  if (hasTable($conn,'payments') && hasTable($conn,'payment_methods') && hasTable($conn,'payment_status')) {
+    $sqlPay = "
+      SELECT
+        pm.code AS method,
+        COALESCE(pm.name_th, pm.name_en, pm.code) AS method_name,
+        COUNT(*) AS cnt,
+        COALESCE(SUM(pay.amount - COALESCE(pay.refund_amount,0)),0) AS amount
+      FROM payments pay
+      JOIN payment_methods pm ON pm.method_id = pay.method_id
+      JOIN payment_status ps ON ps.id = pay.payment_status_id
+      JOIN bookings b ON b.booking_id = pay.booking_id
+      INNER JOIN customers cu ON cu.customer_id = b.customer_id
+      LEFT JOIN faculty f ON f.id = cu.faculty_id
+      LEFT JOIN branches br ON br.branch_id = b.branch_id
+      LEFT JOIN provinces pv ON pv.province_id = br.province_id
+      LEFT JOIN region rg ON rg.region_id = pv.region_id
+      WHERE $whereSql
+        AND ps.code IN ('PAID','REFUNDED')
+      GROUP BY pm.code, pm.name_th, pm.name_en
+      ORDER BY amount DESC
+    ";
+    $st = $conn->prepare($sqlPay);
+    stmtBindDynamic($st, $types, $vals);
+    $st->execute();
+    $rows = fetchAll($st);
+    $st->close();
 
-      $paymentMethodSummary = array_map(fn($r)=>[
-        "method" => $r["method"],
-        "method_name" => $r["method_name"],
-        "count" => (int)($r["cnt"] ?? 0),
-        "amount" => (float)($r["amount"] ?? 0),
-      ], $rows);
-    }
-  } catch (Throwable $_) {
-    $paymentMethodSummary = [];
+    $paymentMethodSummary = array_map(fn($r)=>[
+      "method" => $r["method"],
+      "method_name" => $r["method_name"],
+      "count" => (int)($r["cnt"] ?? 0),
+      "amount" => (float)($r["amount"] ?? 0),
+    ], $rows);
   }
 
+  // 4) Review summary (ตาราง review ของคุณมี)
+  $reviewSummary = ["total_reviews"=>0,"avg_rating"=>0,"recent_reviews"=>[]];
+  if (hasTable($conn,'review')) {
+    $sqlR = "
+      SELECT
+        COUNT(*) AS total_reviews,
+        COALESCE(AVG(r.rating),0) AS avg_rating
+      FROM review r
+      JOIN bookings b ON b.booking_id = r.booking_id
+      INNER JOIN customers cu ON cu.customer_id = b.customer_id
+      LEFT JOIN faculty f ON f.id = cu.faculty_id
+      LEFT JOIN branches br ON br.branch_id = b.branch_id
+      LEFT JOIN provinces pv ON pv.province_id = br.province_id
+      LEFT JOIN region rg ON rg.region_id = pv.region_id
+      WHERE $whereSql
+    ";
+    $st = $conn->prepare($sqlR);
+    stmtBindDynamic($st, $types, $vals);
+    $st->execute();
+    $row = fetchOne($st);
+    $st->close();
+
+    $sqlRecent = "
+      SELECT r.review_date, r.review_text, r.rating
+      FROM review r
+      JOIN bookings b ON b.booking_id = r.booking_id
+      INNER JOIN customers cu ON cu.customer_id = b.customer_id
+      LEFT JOIN faculty f ON f.id = cu.faculty_id
+      LEFT JOIN branches br ON br.branch_id = b.branch_id
+      LEFT JOIN provinces pv ON pv.province_id = br.province_id
+      LEFT JOIN region rg ON rg.region_id = pv.region_id
+      WHERE $whereSql
+      ORDER BY r.review_date DESC
+      LIMIT 5
+    ";
+    $st = $conn->prepare($sqlRecent);
+    stmtBindDynamic($st, $types, $vals);
+    $st->execute();
+    $recent = fetchAll($st);
+    $st->close();
+
+    $reviewSummary = [
+      "total_reviews" => (int)($row["total_reviews"] ?? 0),
+      "avg_rating" => (float)($row["avg_rating"] ?? 0),
+      "recent_reviews" => array_map(fn($r)=>[
+        "date" => $r["review_date"],
+        "text" => $r["review_text"],
+        "rating" => (float)$r["rating"],
+      ], $recent),
+    ];
+  }
+
+  // ===== ส่ง response (มี alias key ให้ JS ไม่พัง) =====
   echo json_encode([
     "success" => true,
     "meta" => [
       "academic_years" => $metaYears,
-      "faculties" => $metaFac,           // [{id,name}]
-      "study_years" => [1,2,3,4],
+      "faculties" => $metaFac,
+      "study_years" => $metaSY,
     ],
     "kpi" => [
       "total_usage" => $total_usage,
-      "top_faculty" => $top_faculty,     // {name,count}
+      "top_faculty" => $top_faculty,
       "usage_rate" => $usage_rate,
       "active_users" => $active_users,
       "total_users" => $total_users,
@@ -451,10 +465,30 @@ try {
     "peak_time" => array_map(fn($r)=>["label"=>$r["tbin"],"count"=>(int)$r["cnt"]], $peakRows),
     "daily_usage" => ["labels"=>$wdMap, "counts"=>$daily],
 
-    // ✅ Executive insights
+    // ✅ keys ใหม่
     "membership_summary" => $membershipSummary,
     "student_coupon_top" => $studentCouponTop,
     "payment_method_summary" => $paymentMethodSummary,
+    "review_summary" => $reviewSummary,
+
+    // ✅ alias keys (เพื่อให้ users.js เก่าอ่านได้)
+    "memberships_summary" => $membershipSummary,
+    "member_tier_summary" => $membershipSummary,
+    "member_tier_summary_table" => $membershipSummary,
+    "member_tier_summary_legacy" => $membershipSummary,
+    "member_tier_summary_v2" => $membershipSummary,
+    "member_tier_summary_v3" => $membershipSummary,
+    "member_tier_summary_v4" => $membershipSummary,
+    "member_tier_summary_v5" => $membershipSummary,
+    "member_tier_summary_v6" => $membershipSummary,
+    "member_tier_summary_v7" => $membershipSummary,
+    "member_tier_summary_v8" => $membershipSummary,
+    "member_tier_summary_v9" => $membershipSummary,
+    "member_tier_summary_v10" => $membershipSummary,
+
+    // สำคัญ: alias ชื่อที่คุณเคยมีใน JSON รูปก่อนหน้า
+    "member_tier_summary" => $membershipSummary,
+    "memberships_summary" => $membershipSummary,
   ], JSON_UNESCAPED_UNICODE);
 
 } catch (Throwable $e) {
