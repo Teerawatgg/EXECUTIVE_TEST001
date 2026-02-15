@@ -5,114 +5,72 @@
   <title>Executive | ผู้ใช้</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/executive.css" />
   <script src="executive-common.js"></script>
 
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
   <style>
-    /* ✅ panel header + print (ตามที่คุณให้ไว้) */
-    .panel-header{
-      display:flex; justify-content:space-between; align-items:flex-start;
-      gap:12px; margin-bottom:12px;
-    }
-    .panel-header h3{ margin:0; }
-    .print-btn{
-      display:inline-flex; align-items:center; gap:8px;
-      padding:10px 16px; border-radius:999px;
-      border:1px solid #dcd6f7; background:#f5f3ff;
-      color:#5b21b6; font-weight:600; cursor:pointer;
-      transition:.2s ease; white-space:nowrap;
-    }
-    .print-btn:hover{ background:#ede9fe; transform:translateY(-1px); }
-    .print-icon{ font-size:16px; }
+    .panel-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;}
+    .panel-header h3{margin:0;}
+    .print-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:999px;border:1px solid #dcd6f7;background:#f5f3ff;color:#5b21b6;font-weight:800;cursor:pointer;transition:.2s ease;white-space:nowrap;}
+    .print-btn:hover{background:#ede9fe;transform:translateY(-1px);}
+    .print-icon{font-size:16px;}
 
-    @media print{
-      .print-btn, header, .sidebar{ display:none !important; }
-      body{ background:#fff; }
-      .panel{ box-shadow:none; border:none; }
-    }
+    @media print{.print-btn,header,.sidebar,.chipRow{display:none!important;}body{background:#fff;}.panel{box-shadow:none;border:none;}}
 
-    /* Dashboard layout */
-    .dash{
-      display:grid;
-      grid-template-columns: repeat(12, 1fr);
-      gap:14px;
-    }
-    .card{
-      border:1px solid #eef0f4;
-      background:#fff;
-      border-radius:14px;
-      padding:14px;
-      box-shadow:0 10px 26px rgba(17,24,39,.06);
-      display:flex; gap:12px; align-items:flex-start;
-      min-height:88px;
-    }
-    .card .ic{
-      width:38px; height:38px; border-radius:10px;
-      display:flex; align-items:center; justify-content:center;
-      background:#f3f4f6;
-      font-size:18px;
-      flex:0 0 auto;
-    }
-    .card .t{ font-weight:900; color:#111827; font-size:12px; }
-    .card .v{ font-weight:900; color:#111827; font-size:18px; margin-top:4px; }
-    .card .s{ font-weight:800; color:#6b7280; font-size:11px; margin-top:2px; }
+    .chipRow{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 14px;}
+    .chip{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;border:1px solid #eef0f4;background:#fff;font-weight:900;color:#111827;font-size:12px;box-shadow:0 8px 18px rgba(17,24,39,.06);}
+    .chip .k{color:#6b7280;font-weight:900;}
+    .chip .v{color:#111827;font-weight:900;}
+    .chip.orange{border-color:#fdba74;background:#fff7ed;color:#9a3412;}
+    .chip.gray{background:#f9fafb;}
 
-    .progress{
-      margin-top:10px;
-      width:100%; height:8px; border-radius:999px;
-      background:#eef2f7; overflow:hidden;
-    }
-    .progress > div{ height:100%; width:0%; background:#22c55e; border-radius:999px; }
+    .dash{display:grid;grid-template-columns:repeat(12,1fr);gap:14px;}
+    .card{border:1px solid #eef0f4;background:#fff;border-radius:14px;padding:14px;box-shadow:0 10px 26px rgba(17,24,39,.06);display:flex;gap:12px;align-items:flex-start;min-height:88px;}
+    .card .ic{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:#f3f4f6;font-size:18px;flex:0 0 auto;}
+    .card .t{font-weight:900;color:#111827;font-size:12px;}
+    .card .v{font-weight:900;color:#111827;font-size:18px;margin-top:4px;}
+    .card .s{font-weight:900;color:#6b7280;font-size:11px;margin-top:2px;}
 
-    .panel-mini{
-      border:1px solid #eef0f4;
-      background:#fff;
-      border-radius:14px;
-      padding:14px;
-      box-shadow:0 10px 26px rgba(17,24,39,.06);
-    }
-    .panel-mini h4{ margin:0 0 10px; font-weight:900; font-size:13px; color:#111827; }
-    .panel-mini .muted{ font-weight:800; color:#6b7280; font-size:11px; margin-top:-6px; margin-bottom:10px; }
+    .progress{margin-top:10px;width:100%;height:8px;border-radius:999px;background:#eef2f7;overflow:hidden;}
+    .progress>div{height:100%;width:0%;background:#22c55e;border-radius:999px;}
 
-    .chartBox{ position:relative; height:240px; }
-    .chartBox.small{ height:210px; }
+    .panel-mini{border:1px solid #eef0f4;background:#fff;border-radius:14px;padding:14px;box-shadow:0 10px 26px rgba(17,24,39,.06);}
+    .panel-mini h4{margin:0 0 10px;font-weight:900;font-size:13px;color:#111827;}
+    .panel-mini .muted{font-weight:900;color:#6b7280;font-size:11px;margin-top:-6px;margin-bottom:10px;}
 
-    .topList .row{
-      display:flex; align-items:center; gap:10px;
-      margin:10px 0;
-    }
-    .topList .rank{
-      width:26px; height:26px; border-radius:999px;
-      background:#ffedd5; color:#9a3412;
-      display:flex; align-items:center; justify-content:center;
-      font-weight:900; font-size:12px;
-    }
-    .topList .name{ font-weight:900; color:#111827; font-size:12px; }
-    .topList .bar{
-      flex:1;
-      height:6px; border-radius:999px; background:#eef2f7; overflow:hidden;
-    }
-    .topList .bar > div{ height:100%; width:0%; background:#f97316; border-radius:999px; }
-    .topList .cnt{ width:64px; text-align:right; font-weight:900; color:#111827; font-size:12px; }
+    .chartBox{position:relative;height:240px;}
+    .chartBox.small{height:210px;}
 
-    .seg{
-      display:flex; gap:8px;
-      justify-content:flex-end;
-      margin-top:-6px;
-    }
-    .seg button{
-      border:1px solid #e5e7eb; background:#fff;
-      padding:6px 10px; border-radius:999px;
-      font-weight:900; cursor:pointer; font-size:12px;
-      color:#111827;
-    }
-    .seg button.active{
-      border-color:#22c55e; background:#dcfce7; color:#166534;
-    }
+    .seg{display:flex;gap:8px;justify-content:flex-end;margin-top:-6px;}
+    .seg button{border:1px solid #e5e7eb;background:#fff;padding:6px 10px;border-radius:999px;font-weight:900;cursor:pointer;font-size:12px;color:#111827;}
+    .seg button.active{border-color:#22c55e;background:#dcfce7;color:#166534;}
+
+    .range-btns{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+    .range-btn{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;font-weight:900;cursor:pointer;user-select:none;transition:.15s ease;}
+    .range-btn:hover{transform:translateY(-1px);}
+    .range-btn input{position:absolute;opacity:0;pointer-events:none;}
+    .dot{width:16px;height:16px;border-radius:999px;border:2px solid #cbd5e1;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;}
+    .dot::after{content:"";width:8px;height:8px;border-radius:999px;background:transparent;display:block;}
+    .range-btn:has(input:checked){border-color:#f97316;background:#ffedd5;color:#9a3412;}
+    .range-btn:has(input:checked) .dot{border-color:#f97316;}
+    .range-btn:has(input:checked) .dot::after{background:#f97316;}
+
+    .list-radio{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+    .item-radio{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #eef0f4;border-radius:12px;background:#fff;cursor:pointer;font-weight:900;}
+    .item-radio:hover{background:#f9fafb;}
+
+    .tableWrap{overflow:auto;}
+    table.mini{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;}
+    table.mini th,table.mini td{padding:10px 10px;border-bottom:1px solid #eef0f4;white-space:nowrap;}
+    table.mini th{text-align:left;color:#6b7280;font-weight:900;background:#fafafa;position:sticky;top:0;z-index:1;}
+    .tr{text-align:right;}
+
+    .topList .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px 0;}
+    .bar{height:7px;border-radius:999px;background:#eef2f7;overflow:hidden;margin-top:6px;}
+    .bar > div{height:100%;border-radius:999px;background:#f97316;width:0%;}
   </style>
 </head>
 
@@ -130,7 +88,6 @@
         </a>
       </div>
     </div>
-
     <div class="header-bottom">
       <nav class="main-nav">
         <a href="index.html" class="nav-item">ภาพรวม</a>
@@ -144,8 +101,16 @@
   <div class="container">
     <aside class="sidebar">
 
+      <section class="filter-block"><h4>ตัวกรอง</h4></section>
+
       <section class="filter-block">
-        <h4>ตัวกรอง</h4>
+        <h4>สาขา</h4>
+        <select id="branchSelect" class="time-select"><option value="ALL">ทั้งหมด</option></select>
+      </section>
+
+      <section class="filter-block">
+        <h4>ภูมิภาค</h4>
+        <select id="regionSelect" class="time-select"><option value="ALL">ทั้งหมด</option></select>
       </section>
 
       <section class="filter-block">
@@ -154,12 +119,24 @@
       </section>
 
       <section class="filter-block">
+        <h4>เพศ</h4>
+        <select id="genderSelect" class="time-select">
+          <option value="ALL">ทั้งหมด</option>
+          <option value="M">ชาย</option>
+          <option value="F">หญิง</option>
+          <option value="O">อื่นๆ</option>
+        </select>
+      </section>
+
+      <section class="filter-block">
         <h4>ช่วงเวลา</h4>
-        <label><input type="radio" name="range" value="all" checked> ทั้งหมด</label><br/>
-        <label><input type="radio" name="range" value="today"> วันนี้</label><br/>
-        <label><input type="radio" name="range" value="7d"> 7 วันที่ผ่านมา</label><br/>
-        <label><input type="radio" name="range" value="30d"> 30 วันที่ผ่านมา</label><br/>
-        <label><input type="radio" name="range" value="custom"> กำหนดเอง</label>
+        <div class="range-btns">
+          <label class="range-btn"><span class="dot"></span><input type="radio" name="range" value="all" checked>ทั้งหมด</label>
+          <label class="range-btn"><span class="dot"></span><input type="radio" name="range" value="today">วันนี้</label>
+          <label class="range-btn"><span class="dot"></span><input type="radio" name="range" value="7d">7 วันที่ผ่านมา</label>
+          <label class="range-btn"><span class="dot"></span><input type="radio" name="range" value="30d">30 วันที่ผ่านมา</label>
+          <label class="range-btn"><span class="dot"></span><input type="radio" name="range" value="custom">กำหนดเอง</label>
+        </div>
 
         <div id="customDateBox" style="display:none;margin-top:10px;">
           <div style="display:flex;flex-direction:column;gap:8px;">
@@ -171,12 +148,12 @@
 
       <section class="filter-block">
         <h4>คณะ</h4>
-        <div id="facultyList" style="display:flex;flex-direction:column;gap:6px;"></div>
+        <div id="facultyList" class="list-radio"></div>
       </section>
 
       <section class="filter-block">
         <h4>ชั้นปี</h4>
-        <div id="studyYearList" style="display:flex;flex-direction:column;gap:6px;"></div>
+        <div id="studyYearList" class="list-radio"></div>
       </section>
 
       <section class="filter-block">
@@ -185,6 +162,7 @@
           <button class="btn" id="btnReset">รีเซ็ต</button>
         </div>
       </section>
+
     </aside>
 
     <main class="content">
@@ -193,16 +171,16 @@
         <div class="panel-header">
           <div>
             <h3>ผู้ใช้</h3>
-            <div class="muted">วิเคราะห์การเข้าใช้งานแยกตามคณะและช่วงเวลา</div>
+            <div class="muted">ข้อมูลสำคัญที่ผู้บริหารต้องรู้จากพฤติกรรมการใช้งาน</div>
           </div>
-          <button class="print-btn" onclick="window.print()">
-            <span class="print-icon">🖨️</span> พิมพ์
-          </button>
+          <button class="print-btn" onclick="window.print()"><span class="print-icon">🖨️</span> พิมพ์</button>
         </div>
+
+        <div class="chipRow" id="filterChips"></div>
 
         <div class="dash">
 
-          <!-- KPI cards -->
+          <!-- ✅ KPI 3 ใบเดิม -->
           <div class="card" style="grid-column: span 4;">
             <div class="ic">👥</div>
             <div style="flex:1;">
@@ -230,20 +208,67 @@
             </div>
           </div>
 
-          <!-- Charts row -->
+          <!-- Charts เดิม -->
           <div class="panel-mini" style="grid-column: span 6;">
-            <h4>การยืมแยกตามคณะ</h4>
+            <h4>การใช้งานแยกตามคณะ</h4>
             <div class="muted">จำนวนการเข้าใช้งาน (ตามตัวกรอง)</div>
             <div class="chartBox"><canvas id="chartFaculty"></canvas></div>
           </div>
 
           <div class="panel-mini" style="grid-column: span 6;">
-            <h4>การยืมอุปกรณ์แยกตามชั้นปี</h4>
+            <h4>การใช้งานแยกตามชั้นปี</h4>
             <div class="muted">จำนวนการเข้าใช้งาน (ตามตัวกรอง)</div>
             <div class="chartBox"><canvas id="chartStudyYear"></canvas></div>
           </div>
 
-          <!-- Bottom row -->
+          <!-- ✅ NEW: ระดับสมาชิก -->
+          <div class="panel-mini" style="grid-column: span 6;">
+            <h4>ระดับสมาชิก: จำนวนการจอง & ยอดใช้จ่ายรวม</h4>
+            <div class="muted">ลูกค้าแต่ละระดับสมาชิกมีการจองทั้งหมดกี่ครั้ง และมียอดใช้จ่ายรวมเท่าใด</div>
+            <div class="tableWrap">
+              <table class="mini">
+                <thead>
+                  <tr>
+                    <th>ระดับสมาชิก</th>
+                    <th class="tr">จำนวนการจอง</th>
+                    <th class="tr">ยอดใช้จ่ายรวม</th>
+                  </tr>
+                </thead>
+                <tbody id="memberTierTbody">
+                  <tr><td colspan="3" style="color:#6b7280;font-weight:900;">กำลังโหลด...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- ✅ NEW: คูปองยอดนิยมในนักศึกษา -->
+          <div class="panel-mini" style="grid-column: span 6;">
+            <h4>คูปองยอดนิยมในกลุ่มนักศึกษา</h4>
+            <div class="muted">คูปองใดถูกนำมาใช้งานมากที่สุด (เฉพาะกลุ่มนักศึกษา)</div>
+            <div id="studentCouponTop" class="topList"></div>
+          </div>
+
+          <!-- ✅ NEW: ช่องทางชำระเงิน -->
+          <div class="panel-mini" style="grid-column: span 6;">
+            <h4>ช่องทางชำระเงินของผู้ใช้</h4>
+            <div class="muted">จำนวนครั้งและยอดรวมตามช่องทางชำระเงิน</div>
+            <div class="tableWrap">
+              <table class="mini">
+                <thead>
+                  <tr>
+                    <th>ช่องทาง</th>
+                    <th class="tr">จำนวนครั้ง</th>
+                    <th class="tr">ยอดรวม</th>
+                  </tr>
+                </thead>
+                <tbody id="paymentMethodTbody">
+                  <tr><td colspan="3" style="color:#6b7280;font-weight:900;">กำลังโหลด...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- เดิม -->
           <div class="panel-mini" style="grid-column: span 6;">
             <h4>อุปกรณ์ยอดนิยม Top 5</h4>
             <div class="muted">อุปกรณ์ที่ถูกยืมมากที่สุด (ตามตัวกรอง)</div>

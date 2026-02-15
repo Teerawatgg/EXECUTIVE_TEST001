@@ -1,16 +1,17 @@
 /* ==========================
-   Executive Dashboard - index.js (UPDATED)
-   - ปรับกราฟให้สวย/แน่นขึ้น (Chart.js options)
-   - Trend: format รายได้เป็นบาท + tooltip ดีขึ้น
-   - Pie -> Doughnut (ดูเต็มขึ้น) + legend ไม่กินพื้นที่
-   - Bar: แท่งหนาขึ้น + borderRadius + interaction ลื่นขึ้น
+   Executive Dashboard - index.js (FIXED v2)
+   ✅ แก้กราฟวงกลมไม่แสดงเมื่อกลับมาหน้าเดิม / canvas หาย
+      - ไม่ replace parentElement.innerHTML
+      - มี Empty State overlay
+      - ถ้า canvas ถูกลบ (จากโค้ดเก่า) => สร้างกลับมาใหม่อัตโนมัติ
+      - pageshow(bfcache) + visibilitychange => reload/redraw
 ========================== */
 
 let chartTrend = null;
 let chartEquipmentPie = null;
 let chartChannelDaily = null;
 
-// optional legacy charts (ถ้าหน้าเก่าเคยมี)
+// optional legacy charts
 let chartBranch = null;
 let chartPayPie = null;
 
@@ -32,13 +33,73 @@ function safeText(id, text) {
   if (el) el.textContent = text;
 }
 
-// Fetch helper (รองรับ 404/500 แบบไม่ทำให้หน้า crash)
 async function apiGet(file, params) {
   const qs = params ? new URLSearchParams(params).toString() : "";
   const url = API_BASE + file + (qs ? "?" + qs : "");
   const res = await fetch(url, { credentials: "include" });
   if (!res.ok) return null;
   try { return await res.json(); } catch { return null; }
+}
+
+// ✅ รอ canvas พร้อม (กันต้องกดรี)
+function renderWhenCanvasReady(canvas, renderFn, tries = 20) {
+  if (!canvas) return;
+  const w = canvas.clientWidth || 0;
+  const h = canvas.clientHeight || 0;
+
+  if ((w === 0 || h === 0) && tries > 0) {
+    requestAnimationFrame(() => renderWhenCanvasReady(canvas, renderFn, tries - 1));
+    return;
+  }
+  setTimeout(() => { try { renderFn(); } catch (e) { console.error(e); } }, 30);
+}
+
+// ✅ overlay “ไม่พบข้อมูล” (ไม่ทำลาย canvas)
+function ensureCanvasEmptyState(canvas, message = "ไม่พบข้อมูล") {
+  if (!canvas) return null;
+  const wrap = canvas.parentElement;
+  if (!wrap) return null;
+
+  let empty = wrap.querySelector(".chart-empty");
+  if (!empty) {
+    empty = document.createElement("div");
+    empty.className = "chart-empty";
+    empty.style.cssText =
+      "position:absolute;inset:0;display:none;align-items:center;justify-content:center;" +
+      "color:#6b7280;font-weight:900;background:transparent;pointer-events:none;";
+    if (getComputedStyle(wrap).position === "static") wrap.style.position = "relative";
+    wrap.appendChild(empty);
+  }
+  empty.textContent = message;
+  return empty;
+}
+
+/* ✅ สำคัญ: ถ้า canvas ถูกลบไป (จากโค้ดเก่า) ให้สร้างกลับมา */
+function ensureEquipmentPieCanvas() {
+  let c = $id("chartEquipmentPie");
+  if (c) return c;
+
+  // โครงใน index.html คือ <div class="chart-wrap"><canvas id="chartEquipmentPie"></canvas></div>
+  // ถ้า canvas หาย ให้หา chart-wrap ของการใช้งานตามอุปกรณ์ แล้วสร้างใหม่
+  const legend = $id("equipmentLegend");
+  const wrap = legend ? legend.previousElementSibling : null;
+
+  if (wrap && wrap.classList && wrap.classList.contains("chart-wrap")) {
+    wrap.innerHTML = `<canvas id="chartEquipmentPie"></canvas>`;
+    c = $id("chartEquipmentPie");
+    return c;
+  }
+
+  // fallback เผื่อ structure เปลี่ยน: หา canvas-wrap แรกใน card นั้น
+  const card = legend ? legend.closest(".card") : null;
+  const wrap2 = card ? card.querySelector(".chart-wrap") : null;
+  if (wrap2) {
+    wrap2.innerHTML = `<canvas id="chartEquipmentPie"></canvas>`;
+    c = $id("chartEquipmentPie");
+    return c;
+  }
+
+  return null;
 }
 
 /* ==========================
@@ -86,10 +147,7 @@ function setupCustomDateBox() {
   };
 
   document.querySelectorAll("input[name='range']").forEach(r => {
-    r.addEventListener("change", () => {
-      sync();
-      autoApply();
-    });
+    r.addEventListener("change", () => { sync(); autoApply(); });
   });
 
   sync();
@@ -116,7 +174,7 @@ function bindFilterEvents() {
 }
 
 /* ==========================
-   Meta (branches/regions)
+   Meta
 ========================== */
 
 async function loadMeta() {
@@ -166,7 +224,7 @@ async function loadKPI(params) {
 }
 
 /* ==========================
-   Payment Summary (2 cards + list)
+   Payment
 ========================== */
 
 function renderPayList(items) {
@@ -190,6 +248,9 @@ function renderPayList(items) {
 }
 
 function renderPayTwoCards(items) {
+  safeText("payMethodAName", "-"); safeText("payMethodAPct", "-"); safeText("payMethodACount", "-");
+  safeText("payMethodBName", "-"); safeText("payMethodBPct", "-"); safeText("payMethodBCount", "-");
+
   if (!items || !items.length) return;
 
   const total = items.reduce((s, x) => s + Number(x.tx_count || 0), 0) || 0;
@@ -214,18 +275,17 @@ function renderPayTwoCards(items) {
 async function loadPayment(params) {
   const pay = await apiGet("get_dashboard_payment_summary.php", params);
   if (!pay || !pay.success) {
+    renderPayTwoCards([]);
     renderPayList([]);
     return;
   }
-
   renderPayTwoCards(pay.items);
   renderPayList(pay.items);
-
   drawLegacyPayPieIfExists(pay.items);
 }
 
 /* ==========================
-   Region Summary Table
+   Region Table
 ========================== */
 
 function renderRegionTable(rows) {
@@ -248,30 +308,32 @@ function renderRegionTable(rows) {
 
 async function loadRegion(params) {
   const rg = await apiGet("get_dashboard_region_summary.php", params);
-  if (!rg || !rg.success) {
-    renderRegionTable([]);
-    return;
-  }
+  if (!rg || !rg.success) { renderRegionTable([]); return; }
   renderRegionTable(rg.regions);
 }
 
 /* ==========================
-   Trend Line (สวยขึ้น)
+   Trend
 ========================== */
 
 function drawTrend(payload) {
   const c = $id("chartTrend");
   if (!c) return;
 
+  const empty = ensureCanvasEmptyState(c, "ไม่พบข้อมูล");
+
   if (!window.Chart) {
-    c.parentElement.innerHTML = `<div style="color:#6b7280;font-weight:800;">ยังไม่ได้โหลด Chart.js</div>`;
+    if (empty) { empty.style.display = "flex"; empty.textContent = "ยังไม่ได้โหลด Chart.js"; }
     return;
   }
 
   if (!payload || !payload.success) {
-    c.parentElement.innerHTML = `<div style="color:#6b7280;font-weight:800;">ยังไม่มี API แนวโน้ม (get_dashboard_trend.php)</div>`;
+    if (chartTrend) { chartTrend.destroy(); chartTrend = null; }
+    if (empty) { empty.style.display = "flex"; empty.textContent = "ไม่พบข้อมูล"; }
     return;
   }
+
+  if (empty) empty.style.display = "none";
 
   if (chartTrend) chartTrend.destroy();
   const ctx = c.getContext("2d");
@@ -281,77 +343,31 @@ function drawTrend(payload) {
     data: {
       labels: payload.labels || [],
       datasets: [
-        {
-          label: "การจอง",
-          data: payload.bookings || [],
-          tension: 0.35,
-          borderWidth: 2,
-          pointRadius: 3,
-          pointHoverRadius: 5,
-          yAxisID: "y"
-        },
-        {
-          label: "รายได้",
-          data: payload.revenue || [],
-          tension: 0.35,
-          borderWidth: 2,
-          pointRadius: 3,
-          pointHoverRadius: 5,
-          yAxisID: "y1"
-        }
+        { label: "การจอง", data: payload.bookings || [], tension: 0.35, borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, yAxisID: "y" },
+        { label: "รายได้", data: payload.revenue || [], tension: 0.35, borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, yAxisID: "y1" }
       ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: "index", intersect: false },
-      layout: { padding: { top: 8, left: 8, right: 8, bottom: 0 } },
       scales: {
-        x: {
-          grid: { display: false },
-          ticks: { maxRotation: 0, autoSkip: true }
-        },
-        y: {
-          beginAtZero: true,
-          ticks: { precision: 0 },
-          title: { display: true, text: "จำนวนการจอง" }
-        },
-        y1: {
-          beginAtZero: true,
-          position: "right",
-          grid: { drawOnChartArea: false },
-          title: { display: true, text: "รายได้ (บาท)" },
-          ticks: { callback: (v) => Number(v).toLocaleString("th-TH") }
-        }
+        x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true } },
+        y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: "จำนวนการจอง" } },
+        y1: { beginAtZero: true, position: "right", grid: { drawOnChartArea: false }, title: { display: true, text: "รายได้ (บาท)" } }
       },
-      plugins: {
-        legend: {
-          position: "bottom",
-          labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true }
-        },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => {
-              const v = ctx.raw ?? 0;
-              if (ctx.dataset?.yAxisID === "y1") {
-                return `${ctx.dataset.label}: ${Number(v).toLocaleString("th-TH")} บาท`;
-              }
-              return `${ctx.dataset.label}: ${Number(v).toLocaleString("th-TH")}`;
-            }
-          }
-        }
-      }
+      plugins: { legend: { position: "bottom" } }
     }
   });
 }
 
 async function loadTrend(params) {
   const data = await apiGet("get_dashboard_trend.php", params);
-  drawTrend(data);
+  renderWhenCanvasReady($id("chartTrend"), () => drawTrend(data));
 }
 
 /* ==========================
-   Equipment (Doughnut + Top 5)
+   Equipment Pie ✅ FIXED v2
 ========================== */
 
 function renderTopList(payload) {
@@ -384,24 +400,35 @@ function renderTopList(payload) {
 }
 
 function drawEquipmentPie(payload) {
-  const c = $id("chartEquipmentPie");
+  // ✅ ถ้า canvas หาย ให้สร้างกลับมาก่อน
+  const c = ensureEquipmentPieCanvas();
   if (!c) return;
 
+  const empty = ensureCanvasEmptyState(c, "ไม่พบข้อมูล");
+
   if (!window.Chart) {
-    c.parentElement.innerHTML = `<div style="color:#6b7280;font-weight:800;">ยังไม่ได้โหลด Chart.js</div>`;
+    if (empty) { empty.style.display = "flex"; empty.textContent = "ยังไม่ได้โหลด Chart.js"; }
     return;
   }
 
   if (!payload || !payload.success) {
-    c.parentElement.innerHTML = `<div style="color:#6b7280;font-weight:800;">ยังไม่มี API อุปกรณ์ (get_dashboard_top_equipment.php)</div>`;
+    if (chartEquipmentPie) { chartEquipmentPie.destroy(); chartEquipmentPie = null; }
+    if (empty) { empty.style.display = "flex"; empty.textContent = "ไม่พบข้อมูล"; }
+    const legend = $id("equipmentLegend");
+    if (legend) legend.innerHTML = "";
     return;
   }
 
   const items = (payload.items || []).slice(0, 5);
   if (!items.length) {
-    c.parentElement.innerHTML = `<div style="color:#6b7280;font-weight:800;">ไม่พบข้อมูล</div>`;
+    if (chartEquipmentPie) { chartEquipmentPie.destroy(); chartEquipmentPie = null; }
+    if (empty) { empty.style.display = "flex"; empty.textContent = "ไม่พบข้อมูล"; }
+    const legend = $id("equipmentLegend");
+    if (legend) legend.innerHTML = "";
     return;
   }
+
+  if (empty) empty.style.display = "none";
 
   if (chartEquipmentPie) chartEquipmentPie.destroy();
   const ctx = c.getContext("2d");
@@ -416,22 +443,11 @@ function drawEquipmentPie(payload) {
       responsive: true,
       maintainAspectRatio: false,
       cutout: "60%",
-      layout: { padding: { top: 8, left: 8, right: 8, bottom: 0 } },
-      plugins: {
-        legend: {
-          position: "bottom",
-          labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true }
-        },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => `${ctx.label}: ${Number(ctx.raw || 0).toLocaleString("th-TH")} ครั้ง`
-          }
-        }
-      }
+      plugins: { legend: { position: "bottom" } }
     }
   });
 
-  // legend list (ข้อความใต้กราฟ)
+  // legend ใต้กราฟ
   const total = items.reduce((s, x) => s + Number(x.count || 0), 0) || 0;
   const legend = $id("equipmentLegend");
   if (legend) {
@@ -440,33 +456,42 @@ function drawEquipmentPie(payload) {
       return `<div>• ${x.name} — ${fmtNum(x.count || 0)} ครั้ง (${pct.toFixed(1)}%)</div>`;
     }).join("");
   }
+
+  try { chartEquipmentPie.resize(); chartEquipmentPie.update(); } catch {}
 }
 
 async function loadTopEquipment(params) {
   const data = await apiGet("get_dashboard_top_equipment.php", params);
   renderTopList(data);
-  drawEquipmentPie(data);
+
+  const canvas = ensureEquipmentPieCanvas();
+  renderWhenCanvasReady(canvas, () => drawEquipmentPie(data));
 }
 
 /* ==========================
-   Channel Daily Bar (สวยขึ้น)
+   Channel Daily
 ========================== */
 
 function drawChannelDaily(payload) {
   const c = $id("chartChannelDaily");
   if (!c) return;
 
+  const empty = ensureCanvasEmptyState(c, "ไม่พบข้อมูล");
+
   if (!window.Chart) {
-    c.parentElement.innerHTML = `<div style="color:#6b7280;font-weight:800;">ยังไม่ได้โหลด Chart.js</div>`;
+    if (empty) { empty.style.display = "flex"; empty.textContent = "ยังไม่ได้โหลด Chart.js"; }
     return;
   }
 
   if (!payload || !payload.success) {
-    c.parentElement.innerHTML = `<div style="color:#6b7280;font-weight:800;">ยังไม่มี API ช่องทางรายวัน (get_dashboard_channel_daily.php)</div>`;
+    if (chartChannelDaily) { chartChannelDaily.destroy(); chartChannelDaily = null; }
+    if (empty) { empty.style.display = "flex"; empty.textContent = "ไม่พบข้อมูล"; }
     safeText("sumOnline", "-");
     safeText("sumWalkin", "-");
     return;
   }
+
+  if (empty) empty.style.display = "none";
 
   if (chartChannelDaily) chartChannelDaily.destroy();
   const ctx = c.getContext("2d");
@@ -476,43 +501,11 @@ function drawChannelDaily(payload) {
     data: {
       labels: payload.labels || [],
       datasets: [
-        {
-          label: "เคาน์เตอร์หน้าร้าน",
-          data: payload.walkin || [],
-          barThickness: 26,
-          maxBarThickness: 36,
-          categoryPercentage: 0.7,
-          barPercentage: 0.9,
-          borderRadius: 8
-        },
-        {
-          label: "เว็บไซต์",
-          data: payload.online || [],
-          barThickness: 26,
-          maxBarThickness: 36,
-          categoryPercentage: 0.7,
-          barPercentage: 0.9,
-          borderRadius: 8
-        }
+        { label: "เคาน์เตอร์หน้าร้าน", data: payload.walkin || [], borderRadius: 8 },
+        { label: "เว็บไซต์", data: payload.online || [], borderRadius: 8 }
       ]
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: "index", intersect: false },
-      layout: { padding: { top: 8, left: 8, right: 8, bottom: 0 } },
-      scales: {
-        x: { grid: { display: false }, ticks: { maxRotation: 0 } },
-        y: { beginAtZero: true, ticks: { precision: 0 }, suggestedMax: 5 }
-      },
-      plugins: {
-        legend: {
-          position: "bottom",
-          labels: { boxWidth: 10, boxHeight: 10, usePointStyle: true }
-        },
-        tooltip: { mode: "index", intersect: false }
-      }
-    }
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }
   });
 
   safeText("sumOnline", fmtNum(payload.avg_online ?? "-"));
@@ -521,11 +514,11 @@ function drawChannelDaily(payload) {
 
 async function loadChannelDaily(params) {
   const data = await apiGet("get_dashboard_channel_daily.php", params);
-  drawChannelDaily(data);
+  renderWhenCanvasReady($id("chartChannelDaily"), () => drawChannelDaily(data));
 }
 
 /* ==========================
-   Legacy (ถ้ายังมี chartBranch/chartPayPie ในหน้าเก่า)
+   Legacy (ถ้ามี)
 ========================== */
 
 function drawLegacyBranchIfExists(rows) {
@@ -545,7 +538,7 @@ function drawLegacyBranchIfExists(rows) {
         { label: "Online", data: rows.map(r => Number(r.online || 0)) }
       ]
     },
-    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+    options: { responsive: true, maintainAspectRatio: false }
   });
 }
 
@@ -559,15 +552,8 @@ function drawLegacyPayPieIfExists(items) {
   items = items || [];
   chartPayPie = new Chart(ctx, {
     type: "pie",
-    data: {
-      labels: items.map(i => i.method_name),
-      datasets: [{ data: items.map(i => Number(i.tx_count || 0)) }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { position: "bottom" } }
-    }
+    data: { labels: items.map(i => i.method_name), datasets: [{ data: items.map(i => Number(i.tx_count || 0)) }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }
   });
 }
 
@@ -605,6 +591,32 @@ function bindTopButtons() {
     window.location.href = "login.html";
   });
 }
+
+/* ==========================
+   Fix: กลับมาหน้าเดิมแล้วกราฟหาย (bfcache/tab back)
+========================== */
+
+window.addEventListener("pageshow", (e) => {
+  if (e.persisted) {
+    loadAll();
+  } else {
+    try {
+      if (chartEquipmentPie) { chartEquipmentPie.resize(); chartEquipmentPie.update(); }
+      if (chartTrend) { chartTrend.resize(); chartTrend.update(); }
+      if (chartChannelDaily) { chartChannelDaily.resize(); chartChannelDaily.update(); }
+    } catch {}
+  }
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    try {
+      if (chartEquipmentPie) { chartEquipmentPie.resize(); chartEquipmentPie.update(); }
+      if (chartTrend) { chartTrend.resize(); chartTrend.update(); }
+      if (chartChannelDaily) { chartChannelDaily.resize(); chartChannelDaily.update(); }
+    } catch {}
+  }
+});
 
 /* ==========================
    Init

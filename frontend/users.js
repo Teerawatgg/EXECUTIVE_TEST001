@@ -1,41 +1,60 @@
-// users.js (FINAL) - robust canvas picking + fixed chart rendering
+// users.js - executive insights for Users page
+// ✅ keeps existing charts + adds:
+// - membership tier summary (bookings + spend)
+// - most used coupon among students
+// - payment method summary (count + spend)
+// ✅ safe fallback if API doesn't send these fields yet
 
 function $id(id) { return document.getElementById(id); }
 function fmtNum(n){ return Number(n||0).toLocaleString("th-TH"); }
+function fmtMoney(n){
+  const v = Number(n||0);
+  return v.toLocaleString("th-TH", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + " ฿";
+}
 
-const API_FILE = "get_users_dashboard.php";
+const API_FILE  = "get_users_dashboard.php";
+const META_FILE = "get_meta.php";
 
 let chartFaculty = null;
 let chartStudyYear = null;
 let chartPeak = null;
+let mode = "peak";
 
-let mode = "peak"; // peak | daily
-
-function showErr(msg){
-  let box = $id("usersError");
-  if (!box) return; // ถ้าไม่มี กล่อง error ก็ไม่บังคับ
-  box.style.display = msg ? "block" : "none";
-  box.textContent = msg || "";
-}
+function destroyChart(ch){ try{ ch?.destroy(); }catch{} return null; }
 
 function getRange(){
-  const el = document.querySelector('input[name="range"]:checked');
-  return el ? el.value : "all";
+  return document.querySelector('input[name="range"]:checked')?.value || "all";
+}
+function getRadioValue(name){
+  return document.querySelector(`input[name="${name}"]:checked`)?.value || "ALL";
+}
+function getSelectText(id){
+  const el = $id(id);
+  if (!el) return "ทั้งหมด";
+  return el.options?.[el.selectedIndex]?.textContent?.trim() || "ทั้งหมด";
 }
 
-function getCheckedValues(containerId){
-  const box = $id(containerId);
-  if (!box) return [];
-  return Array.from(box.querySelectorAll('input[type="checkbox"]:checked')).map(x=>x.value);
+function setupCustomDateBox(){
+  const box = $id("customDateBox");
+  if (!box) return;
+
+  const sync = () => {
+    box.style.display = (getRange() === "custom") ? "block" : "none";
+  };
+
+  document.querySelectorAll('input[name="range"]').forEach(r=>{
+    r.addEventListener("change", sync);
+  });
+  sync();
 }
 
 function getParams(){
   const p = {};
   const ay = $id("academicYear")?.value || "ALL";
-  const range = getRange();
+  if (ay !== "ALL" && ay !== "") p.academic_year = ay;
 
+  const range = getRange();
   p.range = range;
-  if (ay && ay !== "ALL") p.academic_year = ay;
 
   if (range === "custom") {
     const from = $id("fromDate")?.value || "";
@@ -44,92 +63,233 @@ function getParams(){
     if (to) p.to = to;
   }
 
-  const fac = getCheckedValues("facultyList");
-  const sy  = getCheckedValues("studyYearList");
-  if (fac.length) p.faculties = fac.join(",");
-  if (sy.length)  p.study_years = sy.join(",");
+  const faculty = getRadioValue("faculty");
+  const sy      = getRadioValue("studyYear");
+  if (faculty !== "ALL") p.faculties = String(faculty);
+  if (sy !== "ALL")      p.study_years = String(sy);
 
+  // ❗ สาขา/ภูมิภาค/เพศ: ตอนนี้ใช้โชว์ใน chips ก่อน (ยังไม่ส่งไป API)
   return p;
 }
 
-function pickCanvasId(candidates){
-  for (const id of candidates) {
-    if ($id(id)) return id;
-  }
-  return null;
+/* ==========================
+   Filter chips summary
+========================== */
+function rangeText(){
+  const r = getRange();
+  if (r === "all") return "ทั้งหมด";
+  if (r === "today") return "วันนี้";
+  if (r === "7d") return "7 วันที่ผ่านมา";
+  if (r === "30d") return "30 วันที่ผ่านมา";
+  if (r === "custom") return "กำหนดเอง";
+  return r;
+}
+function facultyText(){
+  const v = getRadioValue("faculty");
+  if (v === "ALL") return "ทั้งหมด";
+  const el = document.querySelector(`input[name="faculty"][value="${v}"]`);
+  return el?.closest("label")?.innerText?.trim()?.replace(/\s+/g," ") || v;
+}
+function studyYearText(){
+  const v = getRadioValue("studyYear");
+  if (v === "ALL") return "ทั้งหมด";
+  return `ปี ${v}`;
+}
+function customDateText(){
+  if (getRange() !== "custom") return "";
+  const from = $id("fromDate")?.value || "";
+  const to   = $id("toDate")?.value || "";
+  if (from && to) return `${from} → ${to}`;
+  if (from) return `เริ่ม ${from}`;
+  if (to) return `ถึง ${to}`;
+  return "";
+}
+function renderFilterChips(){
+  const wrap = $id("filterChips");
+  if (!wrap) return;
+
+  const ay = $id("academicYear")?.value || "ALL";
+  const cd = customDateText();
+
+  const chips = [
+    {k:"สาขา", v:getSelectText("branchSelect"), cls:"gray"},
+    {k:"ภูมิภาค", v:getSelectText("regionSelect"), cls:"gray"},
+    {k:"เพศ", v:getSelectText("genderSelect"), cls:"gray"},
+    {k:"ปี", v:(ay === "ALL" ? "ทั้งหมด" : ay), cls:"gray"},
+    {k:"ช่วงเวลา", v: cd ? `${rangeText()} (${cd})` : rangeText(), cls:"orange"},
+    {k:"คณะ", v: facultyText(), cls:"gray"},
+    {k:"ชั้นปี", v: studyYearText(), cls:"gray"},
+  ];
+
+  wrap.innerHTML = chips.map(c => `
+    <div class="chip ${c.cls}">
+      <span class="k">${c.k}:</span>
+      <span class="v">${c.v}</span>
+    </div>
+  `).join("");
 }
 
-function destroyChart(ch){
-  try { if (ch) ch.destroy(); } catch(_){}
-  return null;
-}
-
+/* ==========================
+   Draw charts
+========================== */
 function drawBar(canvasId, labels, data){
   const c = $id(canvasId);
-  if (!c) return null;
-  if (!window.Chart) {
-    console.error("Chart.js not loaded");
-    return null;
-  }
+  if (!c || !window.Chart) return null;
 
   return new Chart(c.getContext("2d"), {
     type: "bar",
-    data: {
-      labels,
-      datasets: [{
-        label: "จำนวน",
-        data,
-        borderRadius: 8,
-        barThickness: 28,
-        maxBarThickness: 44,
-      }]
-    },
+    data: { labels, datasets: [{ label:"จำนวน", data, borderRadius: 8, barThickness: 28, maxBarThickness: 44 }] },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { display:false }, ticks: { maxRotation: 0 } },
-        y: { beginAtZero: true, ticks: { precision: 0 } }
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ grid:{ display:false }, ticks:{ maxRotation:0 } },
+        y:{ beginAtZero:true, ticks:{ precision:0 } }
       }
     }
   });
 }
 
-function renderMeta(meta){
-  // ปีการศึกษา
-  const sel = $id("academicYear");
-  if (sel && Array.isArray(meta?.academic_years)) {
-    const years = meta.academic_years;
-    sel.innerHTML =
+/* ==========================
+   NEW: Executive insights renderers
+   Expect API (optional fields):
+   - res.membership_summary: [{tier:"Gold", bookings: 12, spend: 3400}, ...]
+   - res.student_coupon_top: [{coupon_code:"STU10", coupon_name:"...", count: 9, discount_total: 300}, ...]
+   - res.payment_method_summary: [{method:"QR", count: 20, amount: 5000}, ...]
+========================== */
+function renderMembershipSummary(res){
+  const tb = $id("memberTierTbody");
+  if (!tb) return;
+
+  const rows = Array.isArray(res?.membership_summary) ? res.membership_summary : [];
+  if (!rows.length){
+    tb.innerHTML = `<tr><td colspan="3" style="color:#6b7280;font-weight:900;">ยังไม่มีข้อมูลจาก API (membership_summary)</td></tr>`;
+    return;
+  }
+
+  tb.innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.tier || r.level || "-"}</td>
+      <td class="tr">${fmtNum(r.bookings || r.booking_count || 0)}</td>
+      <td class="tr">${fmtMoney(r.spend || r.amount || r.total_amount || 0)}</td>
+    </tr>
+  `).join("");
+}
+
+function renderStudentCouponTop(res){
+  const wrap = $id("studentCouponTop");
+  if (!wrap) return;
+
+  const rows = Array.isArray(res?.student_coupon_top) ? res.student_coupon_top : [];
+  if (!rows.length){
+    wrap.innerHTML = `<div style="color:#6b7280;font-weight:900;">ยังไม่มีข้อมูลจาก API (student_coupon_top)</div>`;
+    return;
+  }
+
+  const max = Math.max(...rows.map(x=>Number(x.count||0)), 1);
+  wrap.innerHTML = rows.slice(0,5).map((r,i)=>{
+    const title = r.coupon_name ? `${r.coupon_code} • ${r.coupon_name}` : (r.coupon_code || r.code || "-");
+    const cnt = Number(r.count || 0);
+    const w = ((cnt*100)/max).toFixed(1);
+    const discount = r.discount_total != null ? `ส่วนลดรวม ${fmtMoney(r.discount_total)}` : "";
+    return `
+      <div style="margin:10px 0;">
+        <div class="row">
+          <div style="font-weight:900;">#${i+1} ${title}</div>
+          <div style="font-weight:900;">${fmtNum(cnt)} ครั้ง</div>
+        </div>
+        ${discount ? `<div style="color:#6b7280;font-weight:900;font-size:11px;margin-top:-6px;">${discount}</div>` : ``}
+        <div class="bar"><div style="width:${w}%"></div></div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderPaymentMethodSummary(res){
+  const tb = $id("paymentMethodTbody");
+  if (!tb) return;
+
+  const rows = Array.isArray(res?.payment_method_summary) ? res.payment_method_summary : [];
+  if (!rows.length){
+    tb.innerHTML = `<tr><td colspan="3" style="color:#6b7280;font-weight:900;">ยังไม่มีข้อมูลจาก API (payment_method_summary)</td></tr>`;
+    return;
+  }
+
+  tb.innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.method || r.method_name || "-"}</td>
+      <td class="tr">${fmtNum(r.count || 0)}</td>
+      <td class="tr">${fmtMoney(r.amount || r.total || 0)}</td>
+    </tr>
+  `).join("");
+}
+
+/* ==========================
+   Meta dropdown (branch/region)
+========================== */
+async function loadBranchRegionMeta(){
+  const meta = await ExecCommon.apiGet(META_FILE, {});
+  if (!meta || !meta.success) return;
+
+  const bs = $id("branchSelect");
+  if (bs) {
+    const keep = bs.value || "ALL";
+    bs.innerHTML =
       `<option value="ALL">ทั้งหมด</option>` +
-      years.map(y => `<option value="${y}">${y}</option>`).join("");
-    if (years.length) sel.value = String(years[0]);
+      (meta.branches || []).map(b => `<option value="${b.branch_id}">${b.branch_id} • ${b.name}</option>`).join("");
+    bs.value = keep;
   }
 
-  // คณะ: meta.faculties = [{id,name}]
-  const facBox = $id("facultyList");
-  if (facBox && Array.isArray(meta?.faculties)) {
-    facBox.innerHTML = meta.faculties.map(f => `
-      <label style="display:flex;gap:8px;align-items:center;">
-        <input type="checkbox" value="${f.id}" checked>
-        <span>${f.name}</span>
-      </label>
-    `).join("");
-  }
-
-  // ชั้นปี
-  const syBox = $id("studyYearList");
-  if (syBox && Array.isArray(meta?.study_years)) {
-    syBox.innerHTML = meta.study_years.map(y => `
-      <label style="display:flex;gap:8px;align-items:center;">
-        <input type="checkbox" value="${y}" checked>
-        <span>ปี ${y}</span>
-      </label>
-    `).join("");
+  const rs = $id("regionSelect");
+  if (rs) {
+    const keep = rs.value || "ALL";
+    rs.innerHTML =
+      `<option value="ALL">ทั้งหมด</option>` +
+      (meta.regions || []).map(r => `<option value="${r.region}">${r.region}</option>`).join("");
+    rs.value = keep;
   }
 }
 
+/* ==========================
+   Render meta from API users dashboard
+========================== */
+function renderMeta(meta){
+  const sel = $id("academicYear");
+  if (sel && Array.isArray(meta?.academic_years)) {
+    const years = meta.academic_years;
+    sel.innerHTML = `<option value="ALL">ทั้งหมด</option>` + years.map(y => `<option value="${y}">${y}</option>`).join("");
+    if (years.length) sel.value = String(years[0]);
+  }
+
+  const facBox = $id("facultyList");
+  if (facBox && Array.isArray(meta?.faculties)) {
+    facBox.innerHTML =
+      `<label class="item-radio"><input type="radio" name="faculty" value="ALL" checked><span>ทั้งหมด</span></label>` +
+      meta.faculties.map(f => `
+        <label class="item-radio">
+          <input type="radio" name="faculty" value="${f.id}">
+          <span>${f.name}</span>
+        </label>
+      `).join("");
+  }
+
+  const syBox = $id("studyYearList");
+  if (syBox && Array.isArray(meta?.study_years)) {
+    syBox.innerHTML =
+      `<label class="item-radio"><input type="radio" name="studyYear" value="ALL" checked><span>ทั้งหมด</span></label>` +
+      meta.study_years.map(y => `
+        <label class="item-radio">
+          <input type="radio" name="studyYear" value="${y}">
+          <span>ปี ${y}</span>
+        </label>
+      `).join("");
+  }
+}
+
+/* ==========================
+   KPI + Top equipment
+========================== */
 function setKPI(kpi){
   $id("kpiTotalUsage") && ($id("kpiTotalUsage").textContent = fmtNum(kpi.total_usage));
   $id("kpiTopFacultyName") && ($id("kpiTopFacultyName").textContent = kpi?.top_faculty?.name || "-");
@@ -146,7 +306,7 @@ function renderTop(items){
 
   items = Array.isArray(items) ? items : [];
   if (!items.length) {
-    wrap.innerHTML = `<div style="color:#6b7280;font-weight:800;">ไม่พบข้อมูล</div>`;
+    wrap.innerHTML = `<div style="color:#6b7280;font-weight:900;">ไม่พบข้อมูล</div>`;
     return;
   }
 
@@ -156,13 +316,11 @@ function renderTop(items){
     const w = ((Number(it.count||0)*100)/max).toFixed(1);
     return `
       <div style="margin:10px 0;">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div class="row">
           <div style="font-weight:900;">#${i+1} ${it.name || "-"}</div>
           <div style="font-weight:900;">${fmtNum(it.count)} ครั้ง</div>
         </div>
-        <div style="height:7px;border-radius:999px;background:#eef2f7;overflow:hidden;margin-top:6px;">
-          <div style="height:100%;width:${w}%;background:#f97316;border-radius:999px;"></div>
-        </div>
+        <div class="bar"><div style="width:${w}%"></div></div>
       </div>
     `;
   }).join("");
@@ -174,70 +332,64 @@ function setMode(next){
   $id("btnPeak")?.classList.toggle("active", mode==="peak");
 }
 
+/* ==========================
+   Load all
+========================== */
 async function load(first){
-  try{
-    showErr("");
+  renderFilterChips();
 
-    const res = await ExecCommon.apiGet(API_FILE, getParams());
-    console.log("dashboard res:", res);
+  const res = await ExecCommon.apiGet(API_FILE, getParams());
+  if (!res || !res.success) return;
 
-    if (!res || !res.success) {
-      showErr("API error: " + (res?.error || "โหลดข้อมูลไม่สำเร็จ"));
-      return;
-    }
+  if (first) renderMeta(res.meta || {});
+  setKPI(res.kpi || {});
+  renderTop(res.top_equipment || []);
 
-    if (first) renderMeta(res.meta || {});
-    setKPI(res.kpi || {});
-    renderTop(res.top_equipment || []);
+  // ✅ Executive insights (safe fallback)
+  renderMembershipSummary(res);
+  renderStudentCouponTop(res);
+  renderPaymentMethodSummary(res);
 
-    // ✅ รองรับหลาย id (กัน HTML ไม่ตรง)
-    const facCanvas = pickCanvasId(["chartFaculty","chartByFaculty","chart_faculty"]);
-    const syCanvas  = pickCanvasId(["chartStudyYear","chartByStudyYear","chart_study_year"]);
-    const pkCanvas  = pickCanvasId(["chartPeak","chartPeakTime","chart_peak","chartDailyUsage","chart_daily"]);
+  // charts
+  chartFaculty = destroyChart(chartFaculty);
+  chartStudyYear = destroyChart(chartStudyYear);
+  chartPeak = destroyChart(chartPeak);
 
-    // Faculty chart
-    if (facCanvas) {
-      const rows = Array.isArray(res.by_faculty) ? res.by_faculty : [];
-      chartFaculty = destroyChart(chartFaculty);
-      chartFaculty = drawBar(facCanvas, rows.map(r=>r.faculty), rows.map(r=>Number(r.count||0)));
-    }
+  const facRows = Array.isArray(res.by_faculty) ? res.by_faculty : [];
+  chartFaculty = drawBar("chartFaculty", facRows.map(r=>r.faculty), facRows.map(r=>Number(r.count||0)));
 
-    // StudyYear chart
-    if (syCanvas) {
-      const rows = Array.isArray(res.by_study_year) ? res.by_study_year : [];
-      chartStudyYear = destroyChart(chartStudyYear);
-      chartStudyYear = drawBar(syCanvas, rows.map(r=>"ปี "+r.study_year), rows.map(r=>Number(r.count||0)));
-    }
+  const syRows = Array.isArray(res.by_study_year) ? res.by_study_year : [];
+  chartStudyYear = drawBar("chartStudyYear", syRows.map(r=>"ปี "+r.study_year), syRows.map(r=>Number(r.count||0)));
 
-    // Peak/Daily chart (canvas เดียว)
-    if (pkCanvas) {
-      chartPeak = destroyChart(chartPeak);
-
-      if (mode === "daily") {
-        const labels = res.daily_usage?.labels || [];
-        const data   = res.daily_usage?.counts || [];
-        chartPeak = drawBar(pkCanvas, labels, data.map(x=>Number(x||0)));
-      } else {
-        const rows = Array.isArray(res.peak_time) ? res.peak_time : [];
-        chartPeak = drawBar(pkCanvas, rows.map(r=>r.label), rows.map(r=>Number(r.count||0)));
-      }
-    }
-  } catch(e){
-    console.error(e);
-    showErr("JS error: " + e.message);
+  if (mode === "daily") {
+    const labels = res.daily_usage?.labels || [];
+    const data   = res.daily_usage?.counts || [];
+    chartPeak = drawBar("chartPeak", labels, data.map(x=>Number(x||0)));
+  } else {
+    const pkRows = Array.isArray(res.peak_time) ? res.peak_time : [];
+    chartPeak = drawBar("chartPeak", pkRows.map(r=>r.label), pkRows.map(r=>Number(r.count||0)));
   }
+
+  renderFilterChips();
 }
 
+/* ==========================
+   Bind UI
+========================== */
 function bindUI(){
   $id("btnApply")?.addEventListener("click", ()=>load(false));
   $id("btnReset")?.addEventListener("click", ()=>location.reload());
-  $id("academicYear")?.addEventListener("change", ()=>load(false));
 
-  $id("facultyList")?.addEventListener("change", ()=>load(false));
-  $id("studyYearList")?.addEventListener("change", ()=>load(false));
+  ["branchSelect","regionSelect","genderSelect","academicYear","fromDate","toDate"].forEach(id=>{
+    $id(id)?.addEventListener("change", ()=>load(false));
+  });
 
   document.querySelectorAll('input[name="range"]').forEach(r=>{
     r.addEventListener("change", ()=>load(false));
+  });
+
+  document.addEventListener("change", (e)=>{
+    if (e.target?.name === "faculty" || e.target?.name === "studyYear") load(false);
   });
 
   $id("btnDaily")?.addEventListener("click", ()=>{ setMode("daily"); load(false); });
@@ -248,6 +400,8 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   const ok = await ExecCommon.requireExecutive();
   if (!ok) return;
 
+  await loadBranchRegionMeta();
+  setupCustomDateBox();
   bindUI();
   setMode("peak");
   await load(true);
