@@ -234,14 +234,33 @@
     </main>
   </div>
 
-  <!-- ✅ สำคัญ: ให้ใช้ CDN Chart.js (ของคุณใน index.js เช็ค window.Chart) -->
+  <!-- ✅ Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- ✅ AUTH GUARD: ต้อง login ก่อน ถึงจะให้โหลด dashboard -->
+  <script>
+    (async function requireLogin(){
+      try{
+        const res = await fetch("/sports_rental_system/executive/api/me.php", {
+          credentials: "include",
+          cache: "no-store"
+        });
+        const me = await res.json();
+        if (!me || !me.success) {
+          location.replace("login.html");
+        }
+      }catch(e){
+        // ถ้า API ล่ม/ไม่ตอบ ก็ส่งกลับหน้า login ไว้ก่อน
+        location.replace("login.html");
+      }
+    })();
+  </script>
 
   <!-- ของคุณ -->
   <script src="executive-common.js"></script>
   <script src="index.js"></script>
 
-  <!-- ทำให้ customDateBox toggle ได้ทันที (เผื่อ css เดิมไม่ได้) -->
+  <!-- customDateBox toggle -->
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       const box = document.getElementById("customDateBox");

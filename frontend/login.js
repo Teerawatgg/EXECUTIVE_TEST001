@@ -1,31 +1,33 @@
-document.addEventListener("DOMContentLoaded", function () {
-  var form = document.getElementById("loginForm");
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("loginForm");
 
-  form.addEventListener("submit", function (e) {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
-    var payload = {
-      email: document.getElementById("email").value,
+    const payload = {
+      username: document.getElementById("username").value.trim(),
       password: document.getElementById("password").value
     };
 
-    fetch("/sports_rental_system/executive/api/login.php", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(payload)
-    })
-      .then(function (res) { return res.json(); })
-      .then(function (data) {
-        if (data.success) {
-          window.location.href = "index.html";
-        } else {
-          alert(data.message || "เข้าสู่ระบบไม่สำเร็จ");
-        }
-      })
-      .catch(function (err) {
-        alert("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้");
-        console.error(err);
+    try {
+      const res = await fetch("/sports_rental_system/executive/api/login.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload)
       });
+
+      const data = await res.json();
+
+      if (data.success) {
+        // ✅ ไปหน้า dashboard
+        window.location.href = "index.html";
+      } else {
+        alert(data.message || "เข้าสู่ระบบไม่สำเร็จ");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("เชื่อมต่อเซิร์ฟเวอร์ไม่ได้");
+    }
   });
 });
