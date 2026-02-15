@@ -5,7 +5,7 @@
   <title>Executive | อุปกรณ์</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/executive.css" />
   <script src="executive-common.js"></script>
 
@@ -26,14 +26,6 @@
     .statLabel{font-size:12px;color:#6b7280;font-weight:900}
     .statValue{font-size:18px;font-weight:900;color:#111827;margin-top:2px}
 
-    /* sidebar rows */
-    .checkList{display:flex;flex-direction:column;gap:8px;margin-top:8px}
-    .chkRow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:1px solid #eef0f4;border-radius:12px;background:#fff}
-    .chkRow:hover{border-color:#e5e7eb}
-    .chkLeft{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:800;color:#111827}
-    .chkCount{font-size:12px;font-weight:900;color:#6b7280;background:#f3f4f6;border:1px solid #e5e7eb;padding:2px 8px;border-radius:999px;min-width:42px;text-align:center}
-
-    /* select blocks like image */
     .selBlock{margin-bottom:12px}
     .selBlock label{display:block;font-weight:900;color:#111827;margin-bottom:6px}
     .selBlock select{
@@ -46,6 +38,13 @@
       outline:none;
     }
     .selBlock select:focus{border-color:#dcd6f7;box-shadow:0 0 0 3px rgba(221,214,254,.6)}
+
+    /* sidebar rows */
+    .checkList{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+    .chkRow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:1px solid #eef0f4;border-radius:12px;background:#fff}
+    .chkRow:hover{border-color:#e5e7eb}
+    .chkLeft{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:800;color:#111827}
+    .chkCount{font-size:12px;font-weight:900;color:#6b7280;background:#f3f4f6;border:1px solid #e5e7eb;padding:2px 8px;border-radius:999px;min-width:42px;text-align:center}
 
     .group{margin-top:14px;background:#fff;border:1px solid #eef0f4;border-radius:14px;box-shadow:0 10px 26px rgba(17,24,39,.06);overflow:hidden}
     .groupHead{padding:12px 14px;border-bottom:1px solid #eef0f4;display:flex;align-items:baseline;justify-content:space-between;gap:12px}
@@ -100,7 +99,6 @@
   <div class="container">
     <aside class="sidebar">
 
-      <!-- ✅ เพิ่มส่วน สาขา / ภูมิภาค -->
       <section class="filter-block">
         <div class="selBlock">
           <label for="branchSelect">สาขา</label>
@@ -127,9 +125,11 @@
         <div id="catList">
           <div style="color:#94a3b8;font-weight:900;">กำลังโหลด...</div>
         </div>
+      </section>
 
-        <div style="margin-top:14px;font-weight:900;color:#111827;">สถานะอุปกรณ์</div>
-        <div class="checkList" id="statusList">
+      <section class="filter-block">
+        <h4>สถานะอุปกรณ์</h4>
+        <div id="statusList">
           <div style="color:#94a3b8;font-weight:900;">กำลังโหลด...</div>
         </div>
       </section>
@@ -150,13 +150,12 @@
             <div class="muted">ข้อมูลรายการอุปกรณ์ แยกตามหมวดหมู่ + สถานะ</div>
           </div>
           <button class="print-btn" onclick="window.print()">
-            <span class="print-icon">🖨️</span> พิมพ์
+            พิมพ์
           </button>
         </div>
 
         <div class="cards">
           <div class="cardStat">
-            <div class="ic">📦</div>
             <div>
               <div class="statLabel">อุปกรณ์ทั้งหมด</div>
               <div class="statValue" id="kpiTotal">-</div>
@@ -164,7 +163,6 @@
           </div>
 
           <div class="cardStat">
-            <div class="ic" style="background:#ecfdf5;">✅</div>
             <div>
               <div class="statLabel">ว่าง</div>
               <div class="statValue" id="kpiAvailable">-</div>
@@ -172,7 +170,6 @@
           </div>
 
           <div class="cardStat">
-            <div class="ic" style="background:#eff6ff;">🕒</div>
             <div>
               <div class="statLabel">กำลังใช้งาน</div>
               <div class="statValue" id="kpiInUse">-</div>
@@ -180,7 +177,6 @@
           </div>
 
           <div class="cardStat">
-            <div class="ic" style="background:#fef2f2;">⚠️</div>
             <div>
               <div class="statLabel">ชำรุด</div>
               <div class="statValue" id="kpiBroken">-</div>

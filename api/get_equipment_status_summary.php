@@ -11,8 +11,15 @@ function safePrepare($conn, $sql) {
 }
 
 try {
-  $branch_id = q("branch_id", "ALL");
+  $branch_id = q("branch_id","ALL");
+  $search    = q("search","");
+  $statusesQ = q("statuses","");
+  $catsQ     = q("categories","");
 
+  $statuses   = array_values(array_filter(array_map("trim", explode(",", $statusesQ))));
+  $categories = array_values(array_filter(array_map("trim", explode(",", $catsQ))));
+
+  // ---------- WHERE for equipment_instances ----------
   $where = "1=1";
   $types = "";
   $vals  = [];
@@ -22,132 +29,218 @@ try {
     addParam($types, $vals, "s", $branch_id);
   }
 
-  // ✅ Cards: normalize status (trim + รองรับหลายคำ)
-  // หมายเหตุ: LOWER() ใช้เพื่อรองรับภาษาอังกฤษด้วย
+  if ($search !== "") {
+    $where .= " AND (ei.instance_code LIKE ? OR em.name LIKE ?)";
+    addParam($types, $vals, "s", "%{$search}%");
+    addParam($types, $vals, "s", "%{$search}%");
+  }
+
+  if (count($categories) > 0) {
+    $in = implode(",", array_fill(0, count($categories), "?"));
+    $where .= " AND COALESCE(TRIM(c.name),'ไม่ระบุหมวดหมู่') IN ($in)";
+    foreach ($categories as $cat) addParam($types, $vals, "s", $cat);
+  }
+
+  // ---------- Base query: compute eff_status ----------
+  $sqlBase = "
+    SELECT
+      ei.instance_code,
+      em.name AS equip_name,
+      COALESCE(TRIM(c.name),'ไม่ระบุหมวดหมู่') AS category,
+      ei.branch_id,
+      CASE
+        WHEN om.instance_code IS NOT NULL THEN 'กำลังซ่อมแซม'
+
+        WHEN TRIM(ei.status) IN ('ว่าง','พร้อมใช้งาน','พร้อมใช้','พร้อม')
+          OR LOWER(TRIM(ei.status)) IN ('ready','available','in_service','free','idle')
+          THEN 'พร้อมใช้งาน'
+
+        WHEN TRIM(ei.status) IN ('เสื่อมสภาพ','เสื่อม')
+          OR LOWER(TRIM(ei.status)) IN ('worn','degraded')
+          THEN 'เสื่อมสภาพ'
+
+        WHEN TRIM(ei.status) IN ('ชำรุด','เสีย','พัง')
+          OR LOWER(TRIM(ei.status)) IN ('broken','damaged')
+          THEN 'ชำรุด'
+
+        WHEN TRIM(ei.status) IN ('กำลังซ่อมแซม','ซ่อมแซม','ซ่อม','กำลังซ่อม')
+          OR LOWER(TRIM(ei.status)) IN ('maintenance','repair','in_repair')
+          THEN 'กำลังซ่อมแซม'
+
+        WHEN ld.damage_level = 'High' THEN 'ชำรุด'
+        WHEN ld.damage_level IN ('Low','Medium') THEN 'เสื่อมสภาพ'
+        ELSE 'พร้อมใช้งาน'
+      END AS eff_status
+
+    FROM equipment_instances ei
+    JOIN equipment_master em ON em.equipment_id = ei.equipment_id
+    LEFT JOIN categories c ON c.category_id = em.category_id
+
+    LEFT JOIN (
+      SELECT ml.instance_code
+      FROM maintenance_logs ml
+      WHERE TRIM(ml.status) IN ('รอดำเนินการ','กำลังดำเนินการ')
+      GROUP BY ml.instance_code
+    ) om ON om.instance_code = ei.instance_code
+
+    LEFT JOIN (
+      SELECT x.instance_code, x.damage_level
+      FROM maintenance_logs x
+      JOIN (
+        SELECT instance_code, MAX(report_date) AS max_date
+        FROM maintenance_logs
+        WHERE TRIM(status) IN ('ดำเนินการเสร็จสิ้น')
+        GROUP BY instance_code
+      ) t ON t.instance_code = x.instance_code AND t.max_date = x.report_date
+    ) ld ON ld.instance_code = ei.instance_code
+
+    WHERE $where
+  ";
+
+  // ✅ status filter ต้องไปอยู่ชั้นนอก (เพราะ eff_status เป็น alias)
+  $typesX = $types;
+  $valsX  = $vals;
+  $filterX = "";
+  if (count($statuses) > 0) {
+    $in = implode(",", array_fill(0, count($statuses), "?"));
+    $filterX = " WHERE X.eff_status IN ($in) ";
+    foreach ($statuses as $s) addParam($typesX, $valsX, "s", $s);
+  }
+
+  // ---------- Cards ----------
   $sqlCards = "
     SELECT
       COUNT(*) AS total,
-
-      SUM(CASE WHEN TRIM(ei.status) IN ('พร้อมใช้งาน','พร้อมใช้','พร้อม') 
-                OR LOWER(TRIM(ei.status)) IN ('ready','available','in_service')
-           THEN 1 ELSE 0 END) AS ready,
-
-      SUM(CASE WHEN TRIM(ei.status) IN ('เสื่อมสภาพ','เสื่อม') 
-                OR LOWER(TRIM(ei.status)) IN ('worn','degraded')
-           THEN 1 ELSE 0 END) AS worn,
-
-      SUM(CASE WHEN TRIM(ei.status) IN ('ชำรุด','เสีย','พัง') 
-                OR LOWER(TRIM(ei.status)) IN ('broken','damaged')
-           THEN 1 ELSE 0 END) AS broken,
-
-      SUM(CASE WHEN TRIM(ei.status) IN ('กำลังซ่อมแซม','ซ่อมแซม','ซ่อม','กำลังซ่อม') 
-                OR LOWER(TRIM(ei.status)) IN ('maintenance','repair','in_repair')
-           THEN 1 ELSE 0 END) AS maintenance
-
-    FROM equipment_instances ei
-    WHERE $where
+      SUM(CASE WHEN X.eff_status='พร้อมใช้งาน' THEN 1 ELSE 0 END) AS ready,
+      SUM(CASE WHEN X.eff_status='เสื่อมสภาพ' THEN 1 ELSE 0 END) AS worn,
+      SUM(CASE WHEN X.eff_status='ชำรุด' THEN 1 ELSE 0 END) AS broken,
+      SUM(CASE WHEN X.eff_status='กำลังซ่อมแซม' THEN 1 ELSE 0 END) AS maintenance
+    FROM ($sqlBase) X
+    $filterX
   ";
   $st = safePrepare($conn, $sqlCards);
-  stmtBindDynamic($st, $types, $vals);
+  stmtBindDynamic($st, $typesX, $valsX);
   $st->execute();
-  $cardsRow = fetchOne($st);
+  $cards = fetchOne($st);
   $st->close();
 
-  $cards = [
-    "total"       => (int)($cardsRow["total"] ?? 0),
-    "ready"       => (int)($cardsRow["ready"] ?? 0),
-    "worn"        => (int)($cardsRow["worn"] ?? 0),
-    "broken"      => (int)($cardsRow["broken"] ?? 0),
-    "maintenance" => (int)($cardsRow["maintenance"] ?? 0),
-  ];
-
-  // ---- status_counts (เผื่อเอาไปทำ checkbox) ----
-  $sqlStatus = "
-    SELECT TRIM(ei.status) AS status, COUNT(*) AS qty
-    FROM equipment_instances ei
-    WHERE $where
-    GROUP BY TRIM(ei.status)
+  // ---------- status_counts ----------
+  $sqlStatusCounts = "
+    SELECT X.eff_status AS status, COUNT(*) AS qty
+    FROM ($sqlBase) X
+    $filterX
+    GROUP BY X.eff_status
     ORDER BY qty DESC
   ";
-  $st = safePrepare($conn, $sqlStatus);
-  stmtBindDynamic($st, $types, $vals);
+  $st = safePrepare($conn, $sqlStatusCounts);
+  stmtBindDynamic($st, $typesX, $valsX);
   $st->execute();
-  $statusCounts = fetchAll($st);
+  $status_counts = fetchAll($st);
   $st->close();
 
-  // ---- category_counts ----
-  $sqlCat = "
-    SELECT COALESCE(TRIM(c.name),'ไม่ระบุหมวดหมู่') AS category, COUNT(*) AS qty
-    FROM equipment_instances ei
-    JOIN equipment_master em ON em.equipment_id = ei.equipment_id
-    LEFT JOIN categories c ON c.category_id = em.category_id
-    WHERE $where
-    GROUP BY category
+  // ---------- category_counts ----------
+  $sqlCatCounts = "
+    SELECT X.category, COUNT(*) AS qty
+    FROM ($sqlBase) X
+    $filterX
+    GROUP BY X.category
     ORDER BY qty DESC
   ";
-  $st = safePrepare($conn, $sqlCat);
-  stmtBindDynamic($st, $types, $vals);
+  $st = safePrepare($conn, $sqlCatCounts);
+  stmtBindDynamic($st, $typesX, $valsX);
   $st->execute();
-  $categoryCounts = fetchAll($st);
+  $category_counts = fetchAll($st);
   $st->close();
 
-  $labels = array_map(fn($r) => $r["category"], $categoryCounts);
-
-  // ---- chart (เดิม) ----
+  // ---------- chart ----------
   $sqlChart = "
-    SELECT
-      COALESCE(TRIM(c.name),'ไม่ระบุหมวดหมู่') AS category,
-      TRIM(ei.status) AS status,
-      COUNT(*) AS qty
-    FROM equipment_instances ei
-    JOIN equipment_master em ON em.equipment_id = ei.equipment_id
-    LEFT JOIN categories c ON c.category_id = em.category_id
-    WHERE $where
-    GROUP BY category, TRIM(ei.status)
+    SELECT X.category, X.eff_status AS status, COUNT(*) AS qty
+    FROM ($sqlBase) X
+    $filterX
+    GROUP BY X.category, X.eff_status
+    ORDER BY X.category
   ";
   $st = safePrepare($conn, $sqlChart);
-  stmtBindDynamic($st, $types, $vals);
+  stmtBindDynamic($st, $typesX, $valsX);
   $st->execute();
-  $chartRows = fetchAll($st);
+  $rows = fetchAll($st);
   $st->close();
 
-  $statuses = ["พร้อมใช้งาน","เสื่อมสภาพ","ชำรุด","กำลังซ่อมแซม"];
+  $labels = [];
+  $statusesList = ["พร้อมใช้งาน","เสื่อมสภาพ","ชำรุด","กำลังซ่อมแซม"];
   $series = [];
-  foreach ($statuses as $s) $series[$s] = array_fill(0, count($labels), 0);
+  foreach ($statusesList as $s) $series[$s] = [];
 
-  $labelIndex = array_flip($labels);
-
-  // ✅ map status จาก DB -> status มาตรฐาน (กันคำไม่ตรง)
-  function normStatus($s){
-    $t = trim((string)$s);
-    $l = strtolower($t);
-    if (in_array($t, ["พร้อมใช้งาน","พร้อมใช้","พร้อม"], true) || in_array($l, ["ready","available","in_service"], true)) return "พร้อมใช้งาน";
-    if (in_array($t, ["เสื่อมสภาพ","เสื่อม"], true) || in_array($l, ["worn","degraded"], true)) return "เสื่อมสภาพ";
-    if (in_array($t, ["ชำรุด","เสีย","พัง"], true) || in_array($l, ["broken","damaged"], true)) return "ชำรุด";
-    if (in_array($t, ["กำลังซ่อมแซม","ซ่อมแซม","ซ่อม","กำลังซ่อม"], true) || in_array($l, ["maintenance","repair","in_repair"], true)) return "กำลังซ่อมแซม";
-    return null;
-  }
-
-  foreach ($chartRows as $r) {
+  $catIndex = [];
+  foreach ($rows as $r) {
     $cat = $r["category"];
-    $stt = normStatus($r["status"]);
-    if (!$stt) continue;
-    if (!isset($labelIndex[$cat])) continue;
-    $series[$stt][$labelIndex[$cat]] += (int)$r["qty"];
+    if (!isset($catIndex[$cat])) {
+      $catIndex[$cat] = count($labels);
+      $labels[] = $cat;
+    }
+  }
+  foreach ($statusesList as $s) $series[$s] = array_fill(0, count($labels), 0);
+
+  foreach ($rows as $r) {
+    $cat = $r["category"];
+    $stt = $r["status"];
+    $qty = (int)$r["qty"];
+    if (!in_array($stt, $statusesList, true)) continue;
+    $i = $catIndex[$cat];
+    $series[$stt][$i] = $qty;
   }
 
-  $chart = ["labels"=>$labels, "statuses"=>$statuses, "series"=>$series];
+  $chart = ["labels"=>$labels, "statuses"=>$statusesList, "series"=>$series];
 
-  // ---- Top5 (เหมือนเดิมของคุณ) ----
-  $top5 = []; // ถ้าคุณมีโค้ด Top5 อยู่แล้วจะเอามาใส่ต่อได้
+  // ---------- Top5 ----------
+  $types2 = "";
+  $vals2  = [];
+  $w2 = "1=1";
+  if ($branch_id !== "ALL" && $branch_id !== "") {
+    $w2 .= " AND ml.branch_id = ?";
+    addParam($types2, $vals2, "s", $branch_id);
+  }
+  if ($search !== "") {
+    $w2 .= " AND (ml.instance_code LIKE ? OR em.name LIKE ?)";
+    addParam($types2, $vals2, "s", "%{$search}%");
+    addParam($types2, $vals2, "s", "%{$search}%");
+  }
+  if (count($categories) > 0) {
+    $in = implode(",", array_fill(0, count($categories), "?"));
+    $w2 .= " AND COALESCE(TRIM(c.name),'ไม่ระบุหมวดหมู่') IN ($in)";
+    foreach ($categories as $cat) addParam($types2, $vals2, "s", $cat);
+  }
+
+  $sqlTop5 = "
+    SELECT em.name AS name, COUNT(*) AS count
+    FROM maintenance_logs ml
+    JOIN equipment_instances ei ON ei.instance_code = ml.instance_code
+    JOIN equipment_master em ON em.equipment_id = ei.equipment_id
+    LEFT JOIN categories c ON c.category_id = em.category_id
+    WHERE $w2
+    GROUP BY em.name
+    ORDER BY COUNT(*) DESC
+    LIMIT 5
+  ";
+  $st = safePrepare($conn, $sqlTop5);
+  stmtBindDynamic($st, $types2, $vals2);
+  $st->execute();
+  $top5 = fetchAll($st);
+  $st->close();
 
   echo json_encode([
-    "success" => true,
-    "cards" => $cards,
-    "status_counts" => $statusCounts,
-    "category_counts" => $categoryCounts,
-    "chart" => $chart,
-    "top5" => $top5
+    "success"=>true,
+    "cards"=>[
+      "total" => (int)($cards["total"] ?? 0),
+      "ready" => (int)($cards["ready"] ?? 0),
+      "worn"  => (int)($cards["worn"] ?? 0),
+      "broken"=> (int)($cards["broken"] ?? 0),
+      "maintenance" => (int)($cards["maintenance"] ?? 0),
+    ],
+    "status_counts"=>array_map(fn($r)=>["status"=>$r["status"],"qty"=>(int)$r["qty"]], $status_counts),
+    "category_counts"=>array_map(fn($r)=>["category"=>$r["category"],"qty"=>(int)$r["qty"]], $category_counts),
+    "chart"=>$chart,
+    "top5"=>array_map(fn($r)=>["name"=>$r["name"],"count"=>(int)$r["count"]], $top5),
   ], JSON_UNESCAPED_UNICODE);
 
 } catch (Exception $e) {

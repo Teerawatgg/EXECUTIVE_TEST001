@@ -1,51 +1,258 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8" />
-  <title>Executive Login</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;700;800&display=swap" rel="stylesheet">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Executive Dashboard | ระบบเช่าอุปกรณ์กีฬา</title>
 
-  <style>
-    *{box-sizing:border-box;font-family:"Noto Sans Thai",system-ui}
-    body{margin:0;background:#f5f6f8;height:100vh;display:flex;justify-content:center;align-items:center}
-    .card{background:#fff;width:390px;padding:30px 28px 24px;border-radius:14px;box-shadow:0 10px 25px rgba(0,0,0,.12);text-align:center}
-    .logo{width:72px;height:72px;background:#f97316;border-radius:18px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:32px;font-weight:900}
-    h2{margin:10px 0 6px;color:#f97316;font-size:20px}
-    .sub{font-size:13px;color:#777;margin-bottom:18px}
-    .grp{text-align:left;margin-bottom:14px}
-    label{font-size:14px;margin-bottom:6px;display:block;color:#333}
-    input{width:100%;padding:11px 12px;border-radius:10px;border:1px solid #ddd;outline:none;font-size:14px}
-    input:focus{border-color:#f97316}
-    .btn{width:100%;border:none;background:#f97316;color:#fff;padding:12px;font-size:15px;border-radius:12px;cursor:pointer;font-weight:800}
-    .btn:hover{filter:brightness(.95)}
-    .note{margin-top:14px;font-size:12px;color:#888}
-  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/executive.css" />
 </head>
 
 <body>
-  <div class="card">
-    <div class="logo">👔</div>
-    <h2>Executive Dashboard</h2>
-    <div class="sub">สำหรับผู้บริหารเท่านั้น (Executive Login)</div>
 
-    <form id="loginForm">
-      <div class="grp">
-        <label>Email</label>
-        <input id="email" type="text" placeholder="กรอกอีเมลผู้บริหาร" required />
+  <!-- ใช้โครง header ตาม executive.css ของคุณ -->
+  <header class="main-header">
+    <div class="header-top">
+      <div class="brand">
+        <div class="brand-name">ระบบเช่าอุปกรณ์กีฬา</div>
+        <small>Sports Equipment Rental System</small>
       </div>
 
-      <div class="grp">
-        <label>รหัสผ่าน</label>
-        <input id="password" type="password" placeholder="กรอกรหัสผ่าน" required />
+      <!-- ✅ มุมขวาบนแบบในรูป: ปุ่มโปรไฟล์ (pill) -->
+      <div class="staff-zone">
+        <a class="pill-btn" href="profile.html" style="text-decoration:none;">
+          <span class="pill-ic">👤</span>
+          โปรไฟล์
+        </a>
       </div>
+    </div>
 
-      <button type="submit" class="btn">เข้าสู่ระบบ</button>
-    </form>
+    <div class="header-bottom">
+      <nav class="main-nav">
+        <a class="nav-item active" href="index.html">ภาพรวม</a>
+        <a class="nav-item" href="users.html">ผู้ใช้</a>
+        <a class="nav-item" href="equipment.html">อุปกรณ์</a>
+        <a class="nav-item" href="equipment-status.html">สถานะอุปกรณ์</a>
+      </nav>
+    </div>
+  </header>
 
-    <div class="note">หากไม่มีสิทธิ์ ระบบจะไม่อนุญาตให้เข้าใช้งาน</div>
+  <div class="exec-layout">
+    <!-- FILTER (เหมือนเดิม) -->
+    <aside class="filter-panel">
+      <div class="filter-card">
+        <div class="filter-title">ตัวกรอง</div>
+
+        <div class="filter-section">
+          <div class="filter-h">ช่วงเวลา</div>
+          <label class="radio-row"><input type="radio" name="range" value="7d"><span>7 วันที่ผ่านมา</span></label>
+          <label class="radio-row"><input type="radio" name="range" value="30d" checked><span>30 วันที่ผ่านมา</span></label>
+          <label class="radio-row"><input type="radio" name="range" value="1y"><span>1 ปีที่ผ่านมา</span></label>
+          <label class="radio-row"><input type="radio" name="range" value="custom"><span class="danger">กำหนดเอง</span></label>
+
+          <div class="date-box" id="customDateBox" style="display:none;">
+            <div class="date-row">
+              <div class="date-l">วันที่เริ่มต้น</div>
+              <input id="fromDate" type="date">
+            </div>
+            <div class="date-row">
+              <div class="date-l">วันที่สิ้นสุด</div>
+              <input id="toDate" type="date">
+            </div>
+          </div>
+        </div>
+
+        <div class="filter-section">
+          <div class="filter-h">สาขา</div>
+          <select id="branchSelect" class="select">
+            <option value="ALL">ทั้งหมด</option>
+          </select>
+        </div>
+
+        <div class="filter-section">
+          <div class="filter-h">ภูมิภาค</div>
+          <select id="regionSelect" class="select">
+            <option value="ALL">ทั้งหมด</option>
+          </select>
+        </div>
+
+        <div class="filter-section">
+          <div class="filter-h">ช่องทางการจอง</div>
+          <label class="check-row"><input id="chWalkin" type="checkbox" checked><span>Walk-in</span></label>
+          <label class="check-row"><input id="chOnline" type="checkbox" checked><span>Online</span></label>
+        </div>
+
+        <div class="filter-actions">
+          <button id="btnApply" class="btn-primary" type="button">ใช้ตัวกรอง</button>
+          <button id="btnReset" class="btn-ghost" type="button">รีเซ็ต</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="exec-main" style="min-width:0;">
+
+      <!-- KPI -->
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">ภาพรวมระบบ</div>
+            <div class="card-sub">สรุปข้อมูลการใช้งานระบบของอุปกรณ์กีฬา</div>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button id="btnPrint" class="pill-btn pill-print" type="button"><span class="pill-ic">🖨️</span>พิมพ์</button>
+            <!-- <button id="btnLogout" class="pill-btn pill-logout" type="button"><span class="pill-ic">🚪</span>ออกจากระบบ</button> -->
+          </div>
+        </div>
+
+        <div class="kpi-grid">
+          <div class="kpi">
+            <div class="kpi-ic ic-orange">📈</div>
+            <div>
+              <div class="kpi-label">การจองทั้งหมด</div>
+              <div class="kpi-value" id="kpiBookings">-</div>
+              <div class="card-sub" id="kpiBookingsDelta"></div>
+            </div>
+          </div>
+
+          <div class="kpi">
+            <div class="kpi-ic ic-purple">👥</div>
+            <div>
+              <div class="kpi-label">ผู้ใช้ทั้งหมด</div>
+              <div class="kpi-value" id="kpiUsers">-</div>
+              <div class="card-sub" id="kpiUsersDelta"></div>
+            </div>
+          </div>
+
+          <div class="kpi">
+            <div class="kpi-ic ic-green">💰</div>
+            <div>
+              <div class="kpi-label">รายได้สุทธิ</div>
+              <div class="kpi-value" id="kpiNet">-</div>
+              <div class="card-sub" id="kpiNetDelta"></div>
+            </div>
+          </div>
+
+          <div class="kpi">
+            <div class="kpi-ic ic-teal">📊</div>
+            <div>
+              <div class="kpi-label">อัตราชำระสำเร็จ</div>
+              <div class="kpi-value" id="kpiPayRate">-</div>
+              <div class="card-sub" id="kpiPayRateDelta"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Payment 2 cards (A/B) -->
+        <div style="margin-top:14px;border-top:1px solid #eef0f4;padding-top:14px;">
+          <div class="filter-h" style="margin:0 0 10px;">การชำระเงิน</div>
+          <div class="grid-2">
+            <div class="pay-item">
+              <div>
+                <div class="pay-name" id="payMethodAName">-</div>
+                <div class="pay-sub"><span id="payMethodACount">-</span> ครั้ง</div>
+              </div>
+              <div class="pay-amt" id="payMethodAPct">-</div>
+            </div>
+            <div class="pay-item">
+              <div>
+                <div class="pay-name" id="payMethodBName">-</div>
+                <div class="pay-sub"><span id="payMethodBCount">-</span> ครั้ง</div>
+              </div>
+              <div class="pay-amt" id="payMethodBPct">-</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Trend + Equipment pie -->
+      <section class="grid-2">
+        <div class="card">
+          <div class="card-head"><div class="card-title">แนวโน้มการเข้าและรายได้</div></div>
+          <div class="chart-wrap"><canvas id="chartTrend"></canvas></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div class="card-title">การใช้งานตามอุปกรณ์</div></div>
+          <div class="chart-wrap"><canvas id="chartEquipmentPie"></canvas></div>
+          <div id="equipmentLegend" class="card-sub" style="margin-top:8px;"></div>
+        </div>
+      </section>
+
+      <!-- Channel daily + Top5 -->
+      <section class="grid-2" style="grid-template-columns:1fr 420px;">
+        <div class="card">
+          <div class="card-head"><div class="card-title">การเช่าตามช่องทาง (รายวัน)</div></div>
+          <div class="chart-wrap"><canvas id="chartChannelDaily"></canvas></div>
+
+          <div class="card-sub" style="margin-top:10px;">
+            <div>• เว็บไซต์: <span id="sumOnline">-</span> เฉลี่ย/วัน</div>
+            <div>• เคาน์เตอร์หน้าร้าน: <span id="sumWalkin">-</span> เฉลี่ย/วัน</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="font-weight:900;padding-bottom:10px;border-bottom:1px solid #eef0f4;">อุปกรณ์ยอดนิยม Top 5</div>
+          <div class="topScroll" id="topEquipmentList">
+            <div style="color:#6b7280;font-weight:900;">กำลังโหลด...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Region table -->
+      <section class="card">
+        <div class="card-head"><div class="card-title">สรุปตามภูมิภาค</div></div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ภูมิภาค</th>
+                <th class="tr">จำนวนจอง</th>
+                <th class="tr">รายได้สุทธิ</th>
+              </tr>
+            </thead>
+            <tbody id="regionTbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Payment list -->
+      <section class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-title">ยอดเงินรวมจากการชำระเงิน (แยกตามวิธี)</div>
+            <div class="card-sub">รวมสุทธิ (Paid - Refunded)</div>
+          </div>
+        </div>
+        <div id="payCards" class="pay-list"></div>
+      </section>
+
+    </main>
   </div>
 
-  <script src="login.js"></script>
+  <!-- ✅ สำคัญ: ให้ใช้ CDN Chart.js (ของคุณใน index.js เช็ค window.Chart) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- ของคุณ -->
+  <script src="executive-common.js"></script>
+  <script src="index.js"></script>
+
+  <!-- ทำให้ customDateBox toggle ได้ทันที (เผื่อ css เดิมไม่ได้) -->
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const box = document.getElementById("customDateBox");
+      const radios = document.querySelectorAll("input[name='range']");
+      const sync = () => {
+        const el = document.querySelector("input[name='range']:checked");
+        box.style.display = (el && el.value === "custom") ? "block" : "none";
+      };
+      radios.forEach(r => r.addEventListener("change", sync));
+      sync();
+    });
+  </script>
 </body>
 </html>

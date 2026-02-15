@@ -1,156 +1,258 @@
 <?php
+// executive/api/get_equipment_overview.php
 require_once __DIR__ . "/_db.php";
+require_once __DIR__ . "/_helpers.php";
+
+// ✅ Always JSON (no HTML warnings)
+ini_set("display_errors", "0");
+error_reporting(E_ALL);
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+header("Content-Type: application/json; charset=utf-8");
+
+// -------------------------
+// Helpers
+// -------------------------
+function containsAny($text, $keywords) {
+  $text = (string)$text;
+  foreach ($keywords as $k) {
+    $k = (string)$k;
+    if ($k === "") continue;
+    if (mb_strpos($text, $k, 0, "UTF-8") !== false) return true;
+  }
+  return false;
+}
 
 try {
-  // ✅ บังคับตามสาขาของ executive
-  $branch_id = $_SESSION["exec_branch_id"];
-  $branch_name = $_SESSION["exec_branch_name"] ?? "";
+  // -------------------------
+  // Inputs
+  // -------------------------
+  $branch_id  = q("branch_id", "ALL");
+  $region     = q("region", "ALL");
+  $search     = trim((string)q("search", ""));
+  $categories = (string)q("categories", ""); // single or comma
+  $statuses   = (string)q("statuses", "");   // comma (status codes or raw text)
 
-  $search    = q("search", "");
-  $catCsv    = q("categories", ""); // category_id CSV
-  $stsCsv    = q("statuses", "");   // AVAILABLE,IN_USE,BROKEN
+  $catArr = array_values(array_filter(array_map("trim", explode(",", $categories))));
+  $stArr  = array_values(array_filter(array_map("trim", explode(",", $statuses))));
 
-  $catIds = array_values(array_filter(array_map("trim", explode(",", $catCsv))));
-  $sts    = array_values(array_filter(array_map("trim", explode(",", $stsCsv))));
+  // -------------------------
+  // GEO join (ตามโครงของโปรเจค)
+  // -------------------------
+  $joinGeo = "
+    LEFT JOIN branches br ON br.branch_id = ei.branch_id
+    LEFT JOIN provinces pv ON pv.province_id = br.province_id
+    LEFT JOIN region rg ON rg.region_id = pv.region_id
+  ";
 
-  $allowed = ["AVAILABLE","IN_USE","BROKEN","MAINTENANCE"];
-  $sts = array_values(array_filter($sts, fn($x)=>in_array($x, $allowed, true)));
-
-  $w = [];
+  // -------------------------
+  // WHERE builder
+  // -------------------------
   $types = "";
-  $vals = [];
+  $vals  = [];
+  $where = ["1=1"];
 
-  // ✅ branch filter always
-  $w[] = "ei.branch_id = ?";
-  $types .= "s";
-  $vals[] = $branch_id;
+  if ($branch_id !== "ALL") { $where[] = "ei.branch_id = ?"; addParam($types,$vals,"s",$branch_id); }
+  if ($region !== "ALL")    { $where[] = "rg.region_name = ?"; addParam($types,$vals,"s",$region); }
 
   if ($search !== "") {
-    $w[] = "(ei.instance_code LIKE ? OR em.equipment_id LIKE ? OR em.name LIKE ?)";
-    $like = "%{$search}%";
-    $types .= "sss";
-    array_push($vals, $like, $like, $like);
+    $where[] = "(ei.instance_code LIKE ? OR ei.equipment_id LIKE ? OR em.name LIKE ?)";
+    $s = "%{$search}%";
+    addParam($types,$vals,"s",$s);
+    addParam($types,$vals,"s",$s);
+    addParam($types,$vals,"s",$s);
   }
 
-  if (count($catIds)) {
-    $place = implode(",", array_fill(0, count($catIds), "?"));
-    $w[] = "em.category_id IN ($place)";
-    $types .= str_repeat("s", count($catIds));
-    foreach ($catIds as $cid) $vals[] = $cid;
+  // categories filter (single/comma)
+  if (count($catArr)) {
+    $ph = [];
+    foreach ($catArr as $c) { $ph[] = "?"; addParam($types,$vals,"s",$c); }
+    $where[] = "em.category_id IN (" . implode(",", $ph) . ")";
   }
 
-  if (count($sts)) {
-    $place = implode(",", array_fill(0, count($sts), "?"));
-    $w[] = "ei.status IN ($place)";
-    $types .= str_repeat("s", count($sts));
-    foreach ($sts as $s) $vals[] = $s;
+  // statuses filter (exact match in DB)
+  if (count($stArr)) {
+    $ph = [];
+    foreach ($stArr as $st) { $ph[] = "?"; addParam($types,$vals,"s",$st); }
+    $where[] = "TRIM(ei.status) IN (" . implode(",", $ph) . ")";
   }
 
-  $whereSql = count($w) ? implode(" AND ", $w) : "1=1";
+  $whereSql = implode(" AND ", $where);
 
-  // 1) summary
-  $sqlSummary = "
+  // =========================================================
+  // 1) SUMMARY BY REAL STATUS (Group by status in DB)
+  // =========================================================
+  $sqlStatusCounts = "
     SELECT
-      COUNT(*) AS total,
-      SUM(CASE WHEN ei.status='AVAILABLE' THEN 1 ELSE 0 END) AS available,
-      SUM(CASE WHEN ei.status='IN_USE' THEN 1 ELSE 0 END) AS in_use,
-      SUM(CASE WHEN ei.status='BROKEN' THEN 1 ELSE 0 END) AS broken
+      COALESCE(TRIM(ei.status), '') AS status,
+      COUNT(*) AS cnt
     FROM equipment_instances ei
-    LEFT JOIN equipment_master em ON em.equipment_id = ei.equipment_id
+    JOIN equipment_master em ON em.equipment_id = ei.equipment_id
+    $joinGeo
     WHERE $whereSql
+    GROUP BY COALESCE(TRIM(ei.status), '')
   ";
-  $st = $conn->prepare($sqlSummary);
-  $st->bind_param($types, ...$vals);
+
+  $st = $conn->prepare($sqlStatusCounts);
+  stmtBindDynamic($st, $types, $vals);
   $st->execute();
-  $sum = $st->get_result()->fetch_assoc() ?: ["total"=>0,"available"=>0,"in_use"=>0,"broken"=>0];
+  $statusRows = fetchAll($st);
   $st->close();
 
-  // 2) categories list (sidebar)
+  // totals
+  $total = 0;
+  foreach ($statusRows as $r) $total += (int)($r["cnt"] ?? 0);
+
+  // ✅ Keyword mapping (กว้าง ๆ ให้ครอบคลุม DB หลากหลาย)
+  $KW_AVAILABLE = ["ว่าง","พร้อม","พร้อมใช้","พร้อมใช้งาน","READY","AVAILABLE"];
+  $KW_INUSE     = [
+    "กำลังใช้","ใช้งาน","กำลังใช้งาน","กำลังเช่า","เช่าอยู่","ถูกยืม","ยืมอยู่","กำลังยืม","กำลังให้ยืม",
+    "IN_USE","IN USE","BORROW","BORROWED","RENT","RENTED","INUSE"
+  ];
+  $KW_BROKEN    = [
+    "ชำรุด","เสีย","พัง","เสียหาย","แตก","หัก","ร้าว","ขาด","เสื่อม","เสื่อมสภาพ",
+    "BROKEN","DAMAGE","DAMAGED","DEFECT"
+  ];
+  $KW_MAINT     = [
+    "ซ่อม","ซ่อมแซม","ซ่อมบำรุง","กำลังซ่อม","กำลังซ่อมแซม","ส่งซ่อม",
+    "MAINT","MAINTENANCE","REPAIR","FIX"
+  ];
+
+  $available = 0; $in_use = 0; $broken = 0; $maintenance = 0;
+  $summary_by_status = [];
+
+  foreach ($statusRows as $r) {
+    $raw = (string)($r["status"] ?? "");
+    $cnt = (int)($r["cnt"] ?? 0);
+
+    $rawTrim = trim($raw);
+    $rawUpper = mb_strtoupper($rawTrim, "UTF-8"); // ครอบคลุม EN
+
+    $summary_by_status[] = ["status" => $raw, "count" => $cnt];
+
+    // ✅ contains match (ทั้ง raw และ upper)
+    if (containsAny($rawTrim, $KW_AVAILABLE) || containsAny($rawUpper, $KW_AVAILABLE)) {
+      $available += $cnt;
+    } elseif (containsAny($rawTrim, $KW_INUSE) || containsAny($rawUpper, $KW_INUSE)) {
+      $in_use += $cnt;
+    } elseif (containsAny($rawTrim, $KW_BROKEN) || containsAny($rawUpper, $KW_BROKEN)) {
+      $broken += $cnt;
+    } elseif (containsAny($rawTrim, $KW_MAINT) || containsAny($rawUpper, $KW_MAINT)) {
+      $maintenance += $cnt;
+    }
+  }
+
+  // =========================================================
+  // 2) CATEGORIES LIST (sidebar)
+  // - ไม่บังคับ category filter เพื่อให้ list หมวดครบใน scope
+  // =========================================================
+  $types2=""; $vals2=[];
+  $where2=["1=1"];
+
+  if ($branch_id !== "ALL") { $where2[] = "ei.branch_id = ?"; addParam($types2,$vals2,"s",$branch_id); }
+  if ($region !== "ALL")    { $where2[] = "rg.region_name = ?"; addParam($types2,$vals2,"s",$region); }
+
+  if ($search !== "") {
+    $where2[] = "(ei.instance_code LIKE ? OR ei.equipment_id LIKE ? OR em.name LIKE ?)";
+    $s = "%{$search}%";
+    addParam($types2,$vals2,"s",$s);
+    addParam($types2,$vals2,"s",$s);
+    addParam($types2,$vals2,"s",$s);
+  }
+
+  if (count($stArr)) {
+    $ph = [];
+    foreach ($stArr as $stt) { $ph[] = "?"; addParam($types2,$vals2,"s",$stt); }
+    $where2[] = "TRIM(ei.status) IN (" . implode(",", $ph) . ")";
+  }
+
+  $whereSql2 = implode(" AND ", $where2);
+
   $sqlCats = "
     SELECT
       em.category_id,
-      TRIM(c.name) AS category_name,
+      COALESCE(c.name, em.category_id) AS category_name,
       COUNT(*) AS total
     FROM equipment_instances ei
-    LEFT JOIN equipment_master em ON em.equipment_id = ei.equipment_id
+    JOIN equipment_master em ON em.equipment_id = ei.equipment_id
     LEFT JOIN categories c ON c.category_id = em.category_id
-    WHERE $whereSql
-    GROUP BY em.category_id, c.name
+    $joinGeo
+    WHERE $whereSql2
+    GROUP BY em.category_id, COALESCE(c.name, em.category_id)
     ORDER BY total DESC, category_name ASC
   ";
+
   $st = $conn->prepare($sqlCats);
-  $st->bind_param($types, ...$vals);
+  stmtBindDynamic($st, $types2, $vals2);
   $st->execute();
-  $rs = $st->get_result();
-  $categories = [];
-  while ($r = $rs->fetch_assoc()) {
-    $categories[] = [
-      "category_id" => $r["category_id"],
-      "category_name" => $r["category_name"] ?: "-",
-      "total" => (int)$r["total"]
-    ];
-  }
+  $categoriesRows = fetchAll($st);
   $st->close();
 
-  // 3) groups (main tables)
+  // =========================================================
+  // 3) ITEMS (grouping list)
+  // =========================================================
   $sqlItems = "
     SELECT
       em.category_id,
-      TRIM(c.name) AS category_name,
-      ei.instance_code,
-      em.name AS equipment_name,
+      COALESCE(c.name, em.category_id) AS category_name,
+      ei.instance_code AS code,
+      em.name,
       ei.status,
       ei.received_date,
       ei.expiry_date
     FROM equipment_instances ei
-    LEFT JOIN equipment_master em ON em.equipment_id = ei.equipment_id
+    JOIN equipment_master em ON em.equipment_id = ei.equipment_id
     LEFT JOIN categories c ON c.category_id = em.category_id
+    $joinGeo
     WHERE $whereSql
-    ORDER BY category_name ASC, ei.instance_code ASC
+    ORDER BY category_name ASC, em.name ASC, ei.instance_code ASC
     LIMIT 2000
   ";
-  $st = $conn->prepare($sqlItems);
-  $st->bind_param($types, ...$vals);
-  $st->execute();
-  $rs = $st->get_result();
 
-  $map = [];
-  while ($r = $rs->fetch_assoc()) {
-    $cid = $r["category_id"] ?? "0";
-    if (!isset($map[$cid])) {
-      $map[$cid] = [
+  $st = $conn->prepare($sqlItems);
+  stmtBindDynamic($st, $types, $vals);
+  $st->execute();
+  $rows = fetchAll($st);
+  $st->close();
+
+  $groupsMap = [];
+  foreach ($rows as $r) {
+    $cid = $r["category_id"] ?? "UNKNOWN";
+    if (!isset($groupsMap[$cid])) {
+      $groupsMap[$cid] = [
         "category_id" => $cid,
-        "category_name" => $r["category_name"] ?: "-",
+        "category_name" => $r["category_name"] ?? $cid,
         "total" => 0,
         "items" => []
       ];
     }
-    $map[$cid]["total"]++;
-    $map[$cid]["items"][] = [
-      "code" => $r["instance_code"],
-      "name" => $r["equipment_name"],
-      "status" => $r["status"],
-      "received_date" => $r["received_date"],
-      "expiry_date" => $r["expiry_date"]
+    $groupsMap[$cid]["total"]++;
+
+    $groupsMap[$cid]["items"][] = [
+      "code" => $r["code"] ?? "-",
+      "name" => $r["name"] ?? "-",
+      "status" => $r["status"] ?? "-",
+      "received_date" => $r["received_date"] ?? null,
+      "expiry_date" => $r["expiry_date"] ?? null
     ];
   }
-  $st->close();
 
   echo json_encode([
     "success" => true,
-    "branch_id" => $branch_id,
-    "branch_name" => $branch_name,
     "summary" => [
-      "total" => (int)$sum["total"],
-      "available" => (int)$sum["available"],
-      "in_use" => (int)$sum["in_use"],
-      "broken" => (int)$sum["broken"],
+      "total" => (int)$total,
+      "available" => (int)$available,
+      "in_use" => (int)$in_use,
+      "broken" => (int)$broken,
+      "maintenance" => (int)$maintenance
     ],
-    "categories" => $categories,
-    "groups" => array_values($map),
-  ], JSON_UNESCAPED_UNICODE);
+    // ✅ ส่งกลับไว้ดูค่า status จริง ๆ ใน DB (ช่วย debug)
+    "summary_by_status" => $summary_by_status,
 
-} catch (Exception $e) {
+    "categories" => $categoriesRows,
+    "groups" => array_values($groupsMap),
+  ]);
+
+} catch (Throwable $e) {
   http_response_code(500);
-  echo json_encode(["success"=>false, "error"=>$e->getMessage()], JSON_UNESCAPED_UNICODE);
+  echo json_encode(["success" => false, "error" => $e->getMessage()]);
 }

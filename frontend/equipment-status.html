@@ -115,7 +115,7 @@
       <div class="muted">ติดตามสถานะและปัญหาของอุปกรณ์กีฬาทั้งหมด</div>
     </div>
     <button class="print-btn" onclick="window.print()">
-      <span class="print-icon">🖨️</span> พิมพ์
+      พิมพ์
     </button>
   </div>
 
@@ -123,25 +123,20 @@
     <!-- LEFT -->
     <aside class="equip-aside">
       <div class="box">
-        <div class="box-title">🔎 ค้นหา</div>
+        <div class="box-title">ค้นหา</div>
         <input id="qSearch" class="in" placeholder="ค้นหาอุปกรณ์..." />
       </div>
 
       <!-- ✅ เพิ่ม “สาขา” -->
       <div class="box">
-        <div class="box-title">🏢 สาขา</div>
+        <div class="box-title">สาขา</div>
         <select id="branchSelect" class="in">
           <option value="ALL">ทั้งหมด</option>
         </select>
       </div>
 
       <div class="box">
-        <div class="box-title">📌 สถานะอุปกรณ์</div>
-        <div id="statusFilters" class="checklist"></div>
-      </div>
-
-      <div class="box">
-        <div class="box-title">🏷️ หมวดหมู่อุปกรณ์</div>
+        <div class="box-title">หมวดหมู่อุปกรณ์</div>
         <div id="categoryFilters" class="checklist"></div>
       </div>
     </aside>
@@ -150,11 +145,11 @@
     <main class="equip-main">
 
       <div class="equip-cards">
-        <div class="card-mini"><div class="ico blue">⬚</div><div><div class="t">อุปกรณ์ทั้งหมด</div><div class="v" id="cTotal">-</div></div></div>
-        <div class="card-mini"><div class="ico green">✓</div><div><div class="t">พร้อมใช้งาน</div><div class="v" id="cReady">-</div></div></div>
-        <div class="card-mini"><div class="ico gray">↘</div><div><div class="t">เสื่อมสภาพ</div><div class="v" id="cWorn">-</div></div></div>
-        <div class="card-mini"><div class="ico red">!</div><div><div class="t">ชำรุด</div><div class="v" id="cBroken">-</div></div></div>
-        <div class="card-mini"><div class="ico orange">⏲</div><div><div class="t">กำลังซ่อมแซม</div><div class="v" id="cMaint">-</div></div></div>
+        <div class="card-mini"><div><div class="t">อุปกรณ์ทั้งหมด</div><div class="v" id="cTotal">-</div></div></div>
+        <div class="card-mini"><div><div class="t">พร้อมใช้งาน</div><div class="v" id="cReady">-</div></div></div>
+        <div class="card-mini"><div><div class="t">เสื่อมสภาพ</div><div class="v" id="cWorn">-</div></div></div>
+        <div class="card-mini"><div><div class="t">ชำรุด</div><div class="v" id="cBroken">-</div></div></div>
+        <div class="card-mini"><div><div class="t">กำลังซ่อมแซม</div><div class="v" id="cMaint">-</div></div></div>
       </div>
 
       <div class="equip-grid2">
@@ -162,12 +157,10 @@
           <div class="panel-title">สถานะแยกตามประเภทอุปกรณ์</div>
           <div class="panel-sub">แสดงแบบกราฟแท่งซ้อนตามสถานะ</div>
           <div class="chartWrap"><canvas id="chartStack"></canvas></div>
-          <div class="legendNote">หมายเหตุ: สีจะอิงตามลำดับสถานะที่มีในข้อมูล</div>
         </section>
 
         <section class="panel">
           <div class="panel-title">อุปกรณ์ที่มีปัญหาบ่อย Top 5</div>
-          <div class="panel-sub">จัดอันดับจากจำนวนปัญหา (issue_count) หรือคะแนนความเสี่ยง</div>
           <div id="top5List" class="topList"></div>
         </section>
       </div>

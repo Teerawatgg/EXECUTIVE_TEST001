@@ -1,10 +1,11 @@
-// executive/equipment.js (UPDATED)
-// - Add filters: branchSelect + regionSelect
-// - Categories: change to RADIO (เลือกได้ทีละ 1 หมวด) + มี "ทั้งหมด"
-// - Statuses: checkbox (เลือกได้หลายสถานะ)
+// executive/equipment.js (REWRITE)
+// ✅ ลบคอลัมน์ "การใช้งาน" ออกทั้งหมด (ไม่แสดง % / เหลือกี่วัน)
+// - Filters: branch / region / search / category(radio) / status(checkbox)
+// - KPI + Category list + Status list + Groups table
+// - Robust JSON fetch (กัน PHP ส่ง HTML error)
 
 (function () {
-  const API = (file, params = {}) => ExecCommon.apiGet(file, params);
+  const API_BASE = "/sports_rental_system/executive/api/";
   const $id = (id) => document.getElementById(id);
 
   const esc = (s) =>
@@ -22,55 +23,108 @@
     const x = String(d).slice(0, 10);
     const [y, m, day] = x.split("-").map((v) => parseInt(v, 10));
     if (!y || !m || !day) return x;
-    const months = ["มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน","กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม"];
+    const months = [
+      "มกราคม","กุมภาพันธ์","มีนาคม","เมษายน","พฤษภาคม","มิถุนายน",
+      "กรกฎาคม","สิงหาคม","กันยายน","ตุลาคม","พฤศจิกายน","ธันวาคม",
+    ];
     return `${day} ${months[m - 1]} ${y + 543}`;
-  }
-
-  function statusPill(status) {
-    const s = String(status || "").toUpperCase();
-    if (s === "AVAILABLE") return `<span class="pill ok">ว่าง</span>`;
-    if (s === "IN_USE") return `<span class="pill use">กำลังใช้งาน</span>`;
-    if (s === "BROKEN") return `<span class="pill bad">ชำรุด</span>`;
-    if (s === "MAINTENANCE") return `<span class="pill maint">ซ่อมบำรุง</span>`;
-    return `<span class="pill muted">${esc(status || "-")}</span>`;
-  }
-
-  function usageText(it) {
-    const uc = it?.usage_count;
-    const ul = it?.usage_limit;
-    if (typeof uc === "number" && typeof ul === "number" && ul > 0) {
-      return `${fmt(uc)}/${fmt(ul)} ครั้ง`;
-    }
-    return "-";
   }
 
   function setText(id, v) {
     const el = $id(id);
-    if (el) el.textContent = (v ?? "-");
+    if (el) el.textContent = v ?? "-";
   }
 
-  // ---- state ----
-  let booted = false;
-  let categoriesCache = [];
-  let summaryCache = null;
+  function showLoadingSidebar() {
+    const cat = $id("catList");
+    const st = $id("statusList");
+    if (cat) cat.innerHTML = `<div style="color:#94a3b8;font-weight:900;">กำลังโหลด...</div>`;
+    if (st) st.innerHTML = `<div style="color:#94a3b8;font-weight:900;">กำลังโหลด...</div>`;
+  }
 
-  // ---- read filters ----
+  function showLoadingMain() {
+    const wrap = $id("groupsWrap");
+    if (wrap) wrap.innerHTML = `<div style="color:#94a3b8;font-weight:900;">กำลังโหลด...</div>`;
+  }
+
+  function showError(message, detail) {
+    const wrap = $id("groupsWrap");
+    if (!wrap) return;
+    wrap.innerHTML = `
+      <div style="color:#b91c1c;font-weight:900;">
+        ${esc(message || "เกิดข้อผิดพลาด")}
+        ${detail ? `<div style="margin-top:8px;color:#64748b;font-weight:800;white-space:pre-wrap;">${esc(detail)}</div>` : ""}
+      </div>
+    `;
+  }
+
+  // -----------------------------
+  // Robust JSON GET
+  // -----------------------------
+  async function apiGetJSON(file, params = {}) {
+    // Prefer ExecCommon.apiGet if exists
+    if (window.ExecCommon && typeof ExecCommon.apiGet === "function") {
+      try {
+        const res = await ExecCommon.apiGet(file, params);
+        if (res && typeof res === "object") return res;
+      } catch (_) {}
+    }
+
+    const qs = new URLSearchParams(params || {}).toString();
+    const url = API_BASE + file + (qs ? "?" + qs : "");
+    const r = await fetch(url, { credentials: "include" });
+    const text = await r.text();
+
+    // HTML error detection
+    if (/^\s*</.test(text) || text.includes("<br") || text.includes("<b>")) {
+      throw new Error(`API ส่ง HTML แทน JSON: ${file}`);
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`JSON parse ไม่ได้: ${file}`);
+    }
+  }
+
+  // -----------------------------
+  // UI helpers
+  // -----------------------------
+  function statusPill(status) {
+    const raw = String(status || "");
+    const u = raw.trim().toUpperCase();
+
+    const isAvail = u.includes("READY") || u.includes("AVAILABLE") || raw.includes("ว่าง") || raw.includes("พร้อม");
+    const isUse = u.includes("RENT") || u.includes("BORROW") || u.includes("IN_USE") || u.includes("IN USE")
+      || raw.includes("กำลัง") || raw.includes("ใช้งาน") || raw.includes("เช่า") || raw.includes("ยืม");
+    const isBroken = u.includes("BROKEN") || u.includes("DAMAGE") || raw.includes("ชำรุด") || raw.includes("เสีย") || raw.includes("พัง") || raw.includes("เสียหาย");
+    const isMaint = u.includes("MAINT") || u.includes("REPAIR") || raw.includes("ซ่อม");
+
+    if (isAvail) return `<span class="pill ok">ว่าง</span>`;
+    if (isUse) return `<span class="pill use">กำลังใช้งาน</span>`;
+    if (isBroken) return `<span class="pill bad">ชำรุด</span>`;
+    if (isMaint) return `<span class="pill maint">ซ่อมบำรุง</span>`;
+    return `<span class="pill muted">${esc(raw || "-")}</span>`;
+  }
+
+  // -----------------------------
+  // Read filters
+  // -----------------------------
   function readBranch() {
     return $id("branchSelect") ? ($id("branchSelect").value || "ALL") : "ALL";
   }
   function readRegion() {
     return $id("regionSelect") ? ($id("regionSelect").value || "ALL") : "ALL";
   }
-
-  // ✅ RADIO: cat (value = ALL หรือ category_id เดียว)
-  function readSelectedCategoryId() {
+  function readSearch() {
+    return ($id("search")?.value || "").trim();
+  }
+  function readCategory() {
     const wrap = $id("catList");
-    if (!wrap) return "ALL";
-    const picked = wrap.querySelector('input[name="cat"]:checked');
+    const picked = wrap?.querySelector('input[name="cat"]:checked');
     return picked ? (picked.value || "ALL") : "ALL";
   }
-
-  function readSelectedStatuses() {
+  function readStatuses() {
     const wrap = $id("statusList");
     if (!wrap) return [];
     return Array.from(wrap.querySelectorAll('input[name="st"]:checked'))
@@ -78,16 +132,29 @@
       .filter(Boolean);
   }
 
-  function readSearch() {
-    return ($id("search")?.value || "").trim();
+  function buildParams() {
+    const params = {
+      branch_id: readBranch(),
+      region: readRegion(),
+    };
+
+    const q = readSearch();
+    if (q) params.search = q;
+
+    const cat = readCategory();
+    if (cat && cat !== "ALL") params.categories = cat;
+
+    const sts = readStatuses();
+    if (sts.length) params.statuses = sts.join(",");
+
+    return params;
   }
 
-  // ---- meta (branch/region options) ----
+  // -----------------------------
+  // Render: meta
+  // -----------------------------
   async function loadMeta() {
-    // ใช้ get_meta.php เดิมของระบบ executive
-    const meta = await API("get_meta.php", {});
-    console.log("[equipment] meta:", meta);
-
+    const meta = await apiGetJSON("get_meta.php", {});
     if (!meta || !meta.success) return;
 
     const bs = $id("branchSelect");
@@ -95,9 +162,11 @@
       const keep = bs.value || "ALL";
       bs.innerHTML =
         `<option value="ALL">ทั้งหมด</option>` +
-        (meta.branches || []).map(b =>
-          `<option value="${esc(b.branch_id)}">${esc(b.branch_id)} • ${esc(b.name)}</option>`
-        ).join("");
+        (meta.branches || []).map((b) => {
+          const id = b.branch_id ?? "";
+          const name = b.name ?? "";
+          return `<option value="${esc(id)}">${esc(id)} • ${esc(name)}</option>`;
+        }).join("");
       bs.value = keep;
     }
 
@@ -106,35 +175,40 @@
       const keep = rs.value || "ALL";
       rs.innerHTML =
         `<option value="ALL">ทั้งหมด</option>` +
-        (meta.regions || []).map(r =>
+        (meta.regions || []).map((r) =>
           `<option value="${esc(r.region)}">${esc(r.region)}</option>`
         ).join("");
       rs.value = keep;
     }
   }
 
-  // ---- render categories RADIO (once) ----
-  function renderCategoriesOnce(categories) {
+  // -----------------------------
+  // Render: categories (radio)
+  // -----------------------------
+  function renderCategories(categories) {
     const wrap = $id("catList");
     if (!wrap) return;
 
+    const totalAll = Array.isArray(categories)
+      ? categories.reduce((s, c) => s + Number(c.total || 0), 0)
+      : 0;
+
     const rows = [];
 
-    // ✅ "ทั้งหมด" radio
     rows.push(`
       <div class="chkRow">
         <label class="chkLeft">
           <input type="radio" name="cat" value="ALL" checked />
           <span>ทั้งหมด</span>
         </label>
-        <span class="chkCount">(${fmt(categories?.reduce((s,c)=>s+Number(c.total||0),0) || 0)})</span>
+        <span class="chkCount">(${fmt(totalAll)})</span>
       </div>
     `);
 
     if (Array.isArray(categories) && categories.length) {
       categories.forEach((c) => {
         const id = c.category_id ?? "";
-        const name = c.category_name ?? "-";
+        const name = c.category_name ?? id ?? "-";
         const total = Number(c.total || 0);
         rows.push(`
           <div class="chkRow">
@@ -152,14 +226,15 @@
 
     wrap.innerHTML = rows.join("");
 
-    // ✅ เปลี่ยน radio -> โหลดใหม่
-    wrap.querySelectorAll('input[name="cat"]').forEach((ch) => {
-      ch.addEventListener("change", () => loadFiltered());
+    wrap.querySelectorAll('input[name="cat"]').forEach((el) => {
+      el.addEventListener("change", () => loadOverview());
     });
   }
 
-  // ---- render statuses (totals from cache) ----
-  function renderStatusesTotals(summary) {
+  // -----------------------------
+  // Render: statuses (checkbox)
+  // -----------------------------
+  function renderStatuses(summary) {
     const wrap = $id("statusList");
     if (!wrap) return;
 
@@ -173,7 +248,7 @@
     wrap.innerHTML = `
       <div class="chkRow">
         <label class="chkLeft">
-          <input type="checkbox" name="st" value="AVAILABLE" />
+          <input type="checkbox" name="st" value="Ready" />
           <span>ว่าง</span>
         </label>
         <span class="chkCount">(${fmt(available)})</span>
@@ -181,7 +256,7 @@
 
       <div class="chkRow">
         <label class="chkLeft">
-          <input type="checkbox" name="st" value="IN_USE" />
+          <input type="checkbox" name="st" value="Rented" />
           <span>กำลังใช้งาน</span>
         </label>
         <span class="chkCount">(${fmt(inUse)})</span>
@@ -189,7 +264,7 @@
 
       <div class="chkRow">
         <label class="chkLeft">
-          <input type="checkbox" name="st" value="BROKEN" />
+          <input type="checkbox" name="st" value="Broken" />
           <span>ชำรุด</span>
         </label>
         <span class="chkCount">(${fmt(broken)})</span>
@@ -198,7 +273,7 @@
       ${maintenance > 0 ? `
         <div class="chkRow">
           <label class="chkLeft">
-            <input type="checkbox" name="st" value="MAINTENANCE" />
+            <input type="checkbox" name="st" value="Maintenance" />
             <span>ซ่อมบำรุง</span>
           </label>
           <span class="chkCount">(${fmt(maintenance)})</span>
@@ -208,12 +283,14 @@
       <div class="muted" style="margin-top:8px;font-weight:900;">รวม: ${fmt(total)} ชิ้น</div>
     `;
 
-    wrap.querySelectorAll('input[name="st"]').forEach((ch) => {
-      ch.addEventListener("change", () => loadFiltered());
+    wrap.querySelectorAll('input[name="st"]').forEach((el) => {
+      el.addEventListener("change", () => loadOverview());
     });
   }
 
-  // ---- KPI ----
+  // -----------------------------
+  // Render: KPI
+  // -----------------------------
   function renderKPI(summary) {
     const s = summary || {};
     setText("kpiTotal", fmt(s.total || 0));
@@ -222,7 +299,9 @@
     setText("kpiBroken", fmt(s.broken || 0));
   }
 
-  // ---- groups ----
+  // -----------------------------
+  // Render: groups (✅ ไม่มีคอลัมน์การใช้งาน)
+  // -----------------------------
   function renderGroups(groups) {
     const wrap = $id("groupsWrap");
     if (!wrap) return;
@@ -241,7 +320,6 @@
           <td style="font-weight:900;">${esc(it.code || "-")}</td>
           <td>${esc(it.name || "-")}</td>
           <td class="tdC">${statusPill(it.status)}</td>
-          <td class="tdR">${esc(usageText(it))}</td>
           <td class="tdC">${esc(fmtDateTH(it.received_date))}</td>
           <td class="tdC">${esc(fmtDateTH(it.expiry_date))}</td>
         </tr>
@@ -255,7 +333,6 @@
               <div class="sub">${fmt(total)} รายการ</div>
             </div>
           </div>
-
           <div class="tableWrap">
             <table class="table">
               <thead>
@@ -263,13 +340,12 @@
                   <th style="width:120px;">รหัส</th>
                   <th>ชื่ออุปกรณ์</th>
                   <th style="width:150px;" class="tdC">สถานะ</th>
-                  <th style="width:140px;" class="tdR">การใช้งาน</th>
                   <th style="width:160px;" class="tdC">วันที่ซื้อ</th>
                   <th style="width:160px;" class="tdC">วันหมดอายุ</th>
                 </tr>
               </thead>
               <tbody>
-                ${rows || `<tr><td colspan="6" class="muted" style="font-weight:900;">ไม่มีรายการ</td></tr>`}
+                ${rows || `<tr><td colspan="5" class="muted" style="font-weight:900;">ไม่มีรายการ</td></tr>`}
               </tbody>
             </table>
           </div>
@@ -278,108 +354,105 @@
     }).join("");
   }
 
-  async function fetchOverview(params) {
-    const res = await API("get_equipment_overview.php", params);
-    console.log("[equipment] overview:", params, res);
-    if (!res || !res.success) throw new Error(res?.message || res?.error || "โหลดข้อมูลไม่สำเร็จ");
-    return res;
-  }
+  // -----------------------------
+  // Load overview
+  // -----------------------------
+  let seq = 0;
+  let booted = false;
 
-  // ---- initial ----
-  async function loadInitial() {
-    const baseParams = {
-      branch_id: readBranch(),
-      region: readRegion(),
-    };
+  async function loadOverview() {
+    const my = ++seq;
+    showLoadingMain();
 
-    const res = await fetchOverview(baseParams);
-
-    categoriesCache = Array.isArray(res.categories) ? res.categories : [];
-    summaryCache = res.summary || null;
-
-    if (!booted) {
-      renderCategoriesOnce(categoriesCache);  // ✅ radio
-      renderStatusesTotals(summaryCache);
-      booted = true;
-    }
-
-    renderKPI(res.summary);
-    renderGroups(res.groups);
-  }
-
-  // ---- filtered ----
-  async function loadFiltered() {
-    const params = {
-      branch_id: readBranch(),
-      region: readRegion(),
-    };
-
-    const q = readSearch();
-    if (q) params.search = q;
-
-    // ✅ category radio
-    const cat = readSelectedCategoryId();
-    if (cat && cat !== "ALL") params.categories = cat; // ส่งตัวเดียว
-
-    // statuses checkbox
-    const sts = readSelectedStatuses();
-    if (sts.length) params.statuses = sts.join(",");
+    const params = buildParams();
 
     try {
-      const res = await fetchOverview(params);
+      const res = await apiGetJSON("get_equipment_overview.php", params);
+      if (my !== seq) return;
 
-      // คง counts sidebar เป็น totals ของสาขา/ภูมิภาคที่เลือก “ล่าสุด”
-      // (ถ้าคุณอยากให้ totals เปลี่ยนตาม filter ก็เปลี่ยนเป็น res.summary ได้)
-      renderStatusesTotals(res.summary);
+      if (!res || !res.success) {
+        showError("โหลดข้อมูลไม่สำเร็จ", JSON.stringify(res || {}, null, 2));
+        return;
+      }
+
+      if (!booted) {
+        renderCategories(res.categories);
+        booted = true;
+      }
+
       renderKPI(res.summary);
+      renderStatuses(res.summary);
       renderGroups(res.groups);
+
     } catch (e) {
-      console.error(e);
-      const wrap = $id("groupsWrap");
-      if (wrap) wrap.innerHTML = `<div style="color:#b91c1c;font-weight:900;">${esc(e.message || "โหลดข้อมูลไม่สำเร็จ")}</div>`;
+      if (my !== seq) return;
+
+      try {
+        const qs = new URLSearchParams(params).toString();
+        const url = API_BASE + "get_equipment_overview.php" + (qs ? "?" + qs : "");
+        const r = await fetch(url, { credentials: "include" });
+        const t = await r.text();
+        showError(
+          "API ผิดพลาด (ไม่ใช่ JSON หรือ Server Error)",
+          `URL: ${url}\n\n--- response preview ---\n${t.slice(0, 300)}`
+        );
+      } catch {
+        showError("โหลดข้อมูลไม่สำเร็จ", e?.message || String(e));
+      }
     }
   }
 
-  // ---- bind ----
-  let typingTimer = null;
-
+  // -----------------------------
+  // Bind UI
+  // -----------------------------
   function bindUI() {
-    $id("btnApply")?.addEventListener("click", () => loadFiltered());
+    $id("btnApply")?.addEventListener("click", () => loadOverview());
     $id("btnReset")?.addEventListener("click", () => location.reload());
 
     const search = $id("search");
+    let typingTimer = null;
+
     if (search) {
       search.addEventListener("input", () => {
         clearTimeout(typingTimer);
-        typingTimer = setTimeout(() => loadFiltered(), 250);
+        typingTimer = setTimeout(() => loadOverview(), 250);
       });
       search.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") loadFiltered();
+        if (e.key === "Enter") loadOverview();
       });
     }
 
-    // ✅ branch/region change -> reload
-    $id("branchSelect")?.addEventListener("change", () => loadInitial());
-    $id("regionSelect")?.addEventListener("change", () => loadInitial());
+    $id("branchSelect")?.addEventListener("change", () => {
+      booted = false;
+      showLoadingSidebar();
+      loadOverview();
+    });
+
+    $id("regionSelect")?.addEventListener("change", () => {
+      booted = false;
+      showLoadingSidebar();
+      loadOverview();
+    });
   }
 
-  // ---- boot ----
+  // -----------------------------
+  // Boot
+  // -----------------------------
   document.addEventListener("DOMContentLoaded", async () => {
-    const ok = await ExecCommon.requireExecutive();
+    const ok = await (window.ExecCommon?.requireExecutive?.() ?? Promise.resolve(true));
     if (!ok) return;
 
     bindUI();
-    await loadMeta();
 
     try {
-      await loadInitial();
+      await loadMeta();
     } catch (e) {
-      console.error(e);
-      const wrap = $id("groupsWrap");
-      if (wrap) wrap.innerHTML = `<div style="color:#b91c1c;font-weight:900;">${esc(e.message || "โหลดข้อมูลไม่สำเร็จ")}</div>`;
+      console.error("[equipment] meta error:", e);
     }
+
+    showLoadingSidebar();
+    await loadOverview();
   });
 
-  // debug
-  window.__equipmentReload = loadFiltered;
+  window.__equipmentReload = loadOverview;
 })();

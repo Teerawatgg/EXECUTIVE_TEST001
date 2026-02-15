@@ -364,3 +364,55 @@ body { margin: 0; }
 .exec-topbar, .exec-tabs { font-family: "Noto Sans Thai", sans-serif; }
 .exec-tabs .tab { text-decoration: none !important; }
 .exec-tabs .tab:visited { color: inherit; }
+
+.tableWrap{overflow:auto;}
+
+table.mini{
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0;
+  font-size:13px;
+  table-layout:fixed;          /* สำคัญ: ให้ width ตามที่กำหนด */
+}
+
+table.mini th,
+table.mini td{
+  padding:12px 14px;
+  border-bottom:1px solid #eef0f4;
+  vertical-align:middle;
+}
+
+table.mini th{
+  text-align:left;
+  color:#6b7280;
+  font-weight:900;
+  background:#fafafa;
+  position:sticky;
+  top:0;
+  z-index:1;
+}
+
+/* ✅ ล็อคความกว้างตามลำดับคอลัมน์ (แก้ “ไม่ตรง” ชัวร์) */
+table.mini th:nth-child(1),
+table.mini td:nth-child(1){ width:55%; }
+
+table.mini th:nth-child(2),
+table.mini td:nth-child(2){ width:15%; }
+
+table.mini th:nth-child(3),
+table.mini td:nth-child(3){ width:30%; }
+
+/* ✅ จัดตัวเลขให้ตรงและอ่านง่าย */
+table.mini th:nth-child(2),
+table.mini td:nth-child(2),
+table.mini th:nth-child(3),
+table.mini td:nth-child(3){
+  text-align:right;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  white-space:nowrap;
+}
+
+/* สวยขึ้น */
+table.mini tbody tr:nth-child(even){ background:#fafbfc; }
+table.mini tbody tr:hover{ background:#f3f4f6; }
