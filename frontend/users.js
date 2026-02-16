@@ -13,13 +13,19 @@ let _token = 0;
 
 function destroyChart(ch){ try{ ch?.destroy(); }catch{} return null; }
 
+/* ✅ Robust JSON (กัน PHP ส่ง HTML / warning) */
 async function apiGet(file, params = {}) {
   const qs = new URLSearchParams(params).toString();
   const url = API_BASE + file + (qs ? "?" + qs : "");
   const res = await fetch(url, { credentials: "include" });
   const text = await res.text();
+
+  // ถ้า server ส่ง HTML มา แปลว่า error
+  if (/^\s*</.test(text) || text.includes("<br") || text.includes("<b>")) {
+    return { success:false, error:"API returned HTML (server error)", raw:text.slice(0, 500), url };
+  }
   try { return JSON.parse(text); }
-  catch { return { success:false, error:"Invalid JSON", raw:text }; }
+  catch { return { success:false, error:"Invalid JSON", raw:text.slice(0, 500), url }; }
 }
 
 async function requireExecutive(){
@@ -65,9 +71,7 @@ function setupCustomDateBox(){
   const box = $id("customDateBox");
   if (!box) return;
 
-  const sync = () => {
-    box.style.display = (getRange()==="custom") ? "block" : "none";
-  };
+  const sync = () => { box.style.display = (getRange()==="custom") ? "block" : "none"; };
   document.querySelectorAll('input[name="range"]').forEach(r => r.addEventListener("change", sync));
   sync();
 }
@@ -204,13 +208,20 @@ function renderMemberTier(res){
   `).join("");
 }
 
-/* ============ Student coupon top ============ */
+/* ============ ✅ Student coupon top (FIX) ============ */
 function renderStudentCouponTop(res){
   const wrap = $id("studentCouponTop");
   if (!wrap) return;
 
-  const rows = Array.isArray(res?.student_coupon_top) ? res.student_coupon_top : [];
-  if (!rows.length) { wrap.innerHTML = `<div style="color:#6b7280;font-weight:900;">ไม่พบข้อมูล</div>`; return; }
+  // ✅ รองรับทั้ง array ตรง ๆ และกรณีห่อเป็น object
+  let rows = [];
+  if (Array.isArray(res?.student_coupon_top)) rows = res.student_coupon_top;
+  else if (Array.isArray(res?.student_coupon_top?.items)) rows = res.student_coupon_top.items;
+
+  if (!rows.length) {
+    wrap.innerHTML = `<div style="color:#6b7280;font-weight:900;">ไม่พบข้อมูล</div>`;
+    return;
+  }
 
   const max = Math.max(...rows.map(x=>Number(x.count||0)), 1);
   wrap.innerHTML = rows.slice(0,5).map((it,i)=>{
@@ -257,12 +268,9 @@ function pickPaymentLabel(r){
   if (code2 === "CARD") return "บัตรเครดิต/เดบิต";
   return v;
 }
-function pickPaymentCount(r){
-  return Number(r?.tx_count ?? r?.count ?? r?.total ?? 0);
-}
-function pickPaymentAmount(r){
-  return Number(r?.net_amount ?? r?.amount ?? r?.total_amount ?? r?.sum_amount ?? 0);
-}
+function pickPaymentCount(r){ return Number(r?.tx_count ?? r?.count ?? r?.total ?? 0); }
+function pickPaymentAmount(r){ return Number(r?.net_amount ?? r?.amount ?? r?.total_amount ?? r?.sum_amount ?? 0); }
+
 function renderPaymentMethod(res){
   const tb = $id("paymentMethodTbody");
   if (!tb) return;
@@ -282,63 +290,35 @@ function renderPaymentMethod(res){
   `).join("");
 }
 
-/* ============ ✅ Ratings by equipment (แทนรีวิว) ============ */
+/* ============ ✅ Equipment ratings (FIX ให้ตรง API) ============ */
 function renderEquipmentRatings(res){
   const totalEl = $id("rvTotal");
   const avgEl   = $id("rvAvg");
   const tb      = $id("equipmentRatingTbody");
   if (!totalEl || !avgEl || !tb) return;
 
-  const sum = res?.review_summary || res?.reviews_summary || {};
-  const totalReviews = Number(sum.total_reviews ?? sum.total ?? 0);
+  // API ของคุณส่งมาเป็น object: equipment_ratings { total_reviews, avg_rating_overall, items[] }
+  const pack = res?.equipment_ratings || null;
+
+  const totalReviews = Number(pack?.total_reviews ?? 0);
+  const avgOverall   = Number(pack?.avg_rating_overall ?? 0);
+
   totalEl.textContent = fmtNum(totalReviews);
-  avgEl.textContent = Number(sum.avg_rating ?? sum.avg ?? 0).toFixed(1);
+  avgEl.textContent   = avgOverall.toFixed(1);
 
-  // 1) API ส่งสรุปมาแล้ว
-  let rows = Array.isArray(res?.equipment_ratings) ? res.equipment_ratings : null;
-
-  // 2) fallback: สร้างจากรายการรีวิว (ต้องมี equipment_name)
-  if (!rows) {
-    const reviews = res?.recent_reviews || res?.latest_reviews || res?.reviews || [];
-    if (!Array.isArray(reviews) || !reviews.length) {
-      tb.innerHTML = `<tr><td colspan="3" style="color:#6b7280;font-weight:900;">ยังไม่มีข้อมูลการให้คะแนนอุปกรณ์</td></tr>`;
-      return;
-    }
-
-    const map = new Map();
-    for (const r of reviews) {
-      const name = String(r.equipment_name || r.equipment || r.item_name || "").trim();
-      if (!name) continue;
-      const rating = Number(r.rating ?? r.score ?? 0);
-
-      const cur = map.get(name) || { equipment_name:name, sum:0, count:0 };
-      cur.sum += rating;
-      cur.count += 1;
-      map.set(name, cur);
-    }
-
-    rows = [...map.values()].map(x => ({
-      equipment_name: x.equipment_name,
-      avg_rating: x.count ? (x.sum / x.count) : 0,
-      count: x.count
-    }));
-  }
-
-  if (!Array.isArray(rows) || !rows.length) {
+  const items = Array.isArray(pack?.items) ? pack.items : [];
+  if (!items.length) {
     tb.innerHTML = `<tr><td colspan="3" style="color:#6b7280;font-weight:900;">ยังไม่มีข้อมูลการให้คะแนนอุปกรณ์</td></tr>`;
     return;
   }
 
-  rows.sort((a,b)=> Number(b.count||0) - Number(a.count||0));
+  const denom = totalReviews > 0 ? totalReviews : (items.reduce((s,r)=>s+Number(r.review_count||0),0) || 1);
 
-  const denom = totalReviews > 0 ? totalReviews : (rows.reduce((s,r)=>s+Number(r.count||0),0) || 1);
-
-  tb.innerHTML = rows.slice(0,10).map(r=>{
-    const name = r.equipment_name || r.name || "-";
-    const avg  = Number(r.avg_rating ?? r.avg ?? 0);
-    const cnt  = Number(r.count ?? r.total ?? 0);
+  tb.innerHTML = items.slice(0,10).map(r=>{
+    const name = r.equipment_name || "-";
+    const avg  = Number(r.avg_rating ?? 0);
+    const cnt  = Number(r.review_count ?? 0);
     const pct  = (cnt * 100) / denom;
-
     return `
       <tr>
         <td title="${name}">${name}</td>
@@ -452,6 +432,9 @@ async function load(first){
   if (t !== _token) return;
 
   if (!res || !res.success) {
+    // ✅ แสดง error ให้ดีขึ้น (จะได้รู้ว่าเป็น 500/HTML/JSON พัง)
+    console.warn("[users] API error:", res);
+
     setKPI({});
     renderMemberTier({});
     renderStudentCouponTop({});
@@ -536,11 +519,7 @@ async function load(first){
 
 /* ============ Bind UI ============ */
 function bindUI(){
-  $id("branchSelect")?.addEventListener("change", ()=>{
-    syncBranchPrimaryUI();
-    load(false);
-  });
-
+  $id("branchSelect")?.addEventListener("change", ()=>{ syncBranchPrimaryUI(); load(false); });
   $id("regionSelect")?.addEventListener("change", ()=>load(false));
   $id("academicYear")?.addEventListener("change", ()=>load(false));
 
@@ -568,9 +547,7 @@ function bindUI(){
     $id("regionSelect") && ($id("regionSelect").value = "ALL");
     $id("academicYear") && ($id("academicYear").value = "ALL");
 
-    document.querySelectorAll('input[name="range"]').forEach(r=>{
-      r.checked = (r.value === "all");
-    });
+    document.querySelectorAll('input[name="range"]').forEach(r=>{ r.checked = (r.value === "all"); });
 
     $id("fromDate") && ($id("fromDate").value = "");
     $id("toDate") && ($id("toDate").value = "");

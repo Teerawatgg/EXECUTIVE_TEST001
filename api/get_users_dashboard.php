@@ -183,7 +183,6 @@ try {
 
     if($hasPayments){
       if($hasPayStatusP){
-        // payments มี status table
         $paidConds[] = "EXISTS (
           SELECT 1
           FROM payments payx
@@ -192,7 +191,6 @@ try {
             AND psx.code = 'PAID'
         )";
       } else {
-        // payments ไม่มี status -> อย่างน้อยมีแถวจ่าย
         $paidConds[] = "EXISTS (
           SELECT 1 FROM payments payx WHERE payx.booking_id = b.booking_id
         )";
@@ -369,30 +367,123 @@ try {
   ], $tierRows);
 
   /* -------------------------
-     Student condition (ตรง DB คุณ)
-     - ใช้ customer_type='student' เป็นหลัก
-     - fallback: มี study_year > 0
+     ✅ Student condition (ให้กว้างขึ้นกัน schema ต่างกัน)
   ------------------------- */
   $studentCondParts = [];
   if (hasColumn($conn,"customers","customer_type")){
     $studentCondParts[] = "(LOWER(TRIM(cu.customer_type)) IN ('student','นักศึกษา'))";
   }
+  if (hasColumn($conn,"customers","is_student")){
+    $studentCondParts[] = "(cu.is_student = 1)";
+  }
   if (hasColumn($conn,"customers","study_year")){
     $studentCondParts[] = "(cu.study_year IS NOT NULL AND cu.study_year <> 0)";
   }
+  if (hasColumn($conn,"customers","faculty_id")){
+    $studentCondParts[] = "(cu.faculty_id IS NOT NULL)";
+  }
   $studentCond = count($studentCondParts) ? "(".implode(" OR ",$studentCondParts).")" : "0=1";
+
+  /* -------------------------
+     ✅ student_coupon_top (คูปองยอดนิยมในกลุ่มนักศึกษา)
+     รองรับหลาย schema:
+     - bookings.coupon_code
+     - bookings.coupon_id + coupons/coupon table
+  ------------------------- */
+  $student_coupon_top = [];
+
+  // Case A: bookings.coupon_code
+  if (hasColumn($conn,"bookings","coupon_code")) {
+    $st = $conn->prepare("
+      SELECT
+        TRIM(b.coupon_code) AS coupon_code,
+        COUNT(*) AS cnt
+      FROM bookings b
+      INNER JOIN customers cu ON cu.customer_id=b.customer_id
+      LEFT JOIN faculty f ON f.id=cu.faculty_id
+      $joinRegion
+      $joinStatusB
+      WHERE $whereSql
+        AND $studentCond
+        AND b.coupon_code IS NOT NULL
+        AND TRIM(b.coupon_code) <> ''
+      GROUP BY TRIM(b.coupon_code)
+      ORDER BY cnt DESC
+      LIMIT 5
+    ");
+    stmtBindDynamic($st, $types, $vals);
+    $st->execute();
+    $rows = fetchAll($st);
+    $st->close();
+
+    $student_coupon_top = array_map(fn($r)=>[
+      "coupon_code" => $r["coupon_code"],
+      "count" => (int)($r["cnt"] ?? 0)
+    ], $rows);
+  }
+
+  // Case B: bookings.coupon_id + coupons table (ถ้าไม่มี coupon_code หรือไม่มีข้อมูล)
+  if (!count($student_coupon_top) && hasColumn($conn,"bookings","coupon_id")) {
+    $couponTable = null;
+
+    if (hasTable($conn,"coupons")) $couponTable = "coupons";
+    else if (hasTable($conn,"coupon")) $couponTable = "coupon";
+
+    if ($couponTable) {
+      $codeCol = hasColumn($conn,$couponTable,"coupon_code") ? "c.coupon_code"
+              : (hasColumn($conn,$couponTable,"code") ? "c.code"
+              : (hasColumn($conn,$couponTable,"coupon_name") ? "c.coupon_name"
+              : (hasColumn($conn,$couponTable,"name") ? "c.name" : null)));
+
+      $idCol = hasColumn($conn,$couponTable,"coupon_id") ? "c.coupon_id"
+            : (hasColumn($conn,$couponTable,"id") ? "c.id" : null);
+
+      if ($codeCol && $idCol) {
+        $st = $conn->prepare("
+          SELECT
+            TRIM($codeCol) AS coupon_code,
+            COUNT(*) AS cnt
+          FROM bookings b
+          INNER JOIN customers cu ON cu.customer_id=b.customer_id
+          LEFT JOIN faculty f ON f.id=cu.faculty_id
+          $joinRegion
+          $joinStatusB
+          LEFT JOIN $couponTable c ON $idCol = b.coupon_id
+          WHERE $whereSql
+            AND $studentCond
+            AND b.coupon_id IS NOT NULL
+            AND $codeCol IS NOT NULL
+            AND TRIM($codeCol) <> ''
+          GROUP BY TRIM($codeCol)
+          ORDER BY cnt DESC
+          LIMIT 5
+        ");
+        stmtBindDynamic($st, $types, $vals);
+        $st->execute();
+        $rows = fetchAll($st);
+        $st->close();
+
+        $student_coupon_top = array_map(fn($r)=>[
+          "coupon_code" => $r["coupon_code"],
+          "count" => (int)($r["cnt"] ?? 0)
+        ], $rows);
+      }
+    }
+  }
 
   /* -------------------------
      Equipment joins (รองรับ equipment_master หรือ equipment)
   ------------------------- */
   $equipJoin = "";
   $equipName = "";
-  if($hasEM){
-    $equipJoin = "LEFT JOIN equipment_master em ON em.equipment_id = d.equipment_id";
-    $equipName = "em.name";
-  } else if($hasE){
-    $equipJoin = "LEFT JOIN equipment em ON em.equipment_id = d.equipment_id";
-    $equipName = hasColumn($conn,"equipment","equipment_name") ? "em.equipment_name" : "em.name";
+  if(hasTable($conn,"booking_details")){
+    if($hasEM){
+      $equipJoin = "LEFT JOIN equipment_master em ON em.equipment_id = d.equipment_id";
+      $equipName = "em.name";
+    } else if($hasE){
+      $equipJoin = "LEFT JOIN equipment em ON em.equipment_id = d.equipment_id";
+      $equipName = hasColumn($conn,"equipment","equipment_name") ? "em.equipment_name" : "em.name";
+    }
   }
 
   /* -------------------------
@@ -424,7 +515,7 @@ try {
     $st->close();
     $top_equipment = array_map(fn($r)=>["name"=>$r["name"],"count"=>(int)$r["cnt"]], $rows);
 
-    // student top 5 ✅
+    // student top 5
     $st=$conn->prepare("
       SELECT $equipName AS name, COALESCE(SUM(d.quantity),0) AS cnt
       FROM booking_details d
@@ -505,8 +596,6 @@ try {
 
   /* -------------------------
      payment_method_summary
-     - ใช้ paid/not-cancelled ผ่าน $whereSql (bookings)
-     - และ payments ก็กรอง PAID/REFUNDED (ถ้ามี)
   ------------------------- */
   $payment_method_summary = [];
 
@@ -554,7 +643,6 @@ try {
 
   /* -------------------------
      equipment_ratings
-     - review.detail_id -> booking_details.detail_id
   ------------------------- */
   $equipment_ratings = [
     "total_reviews" => 0,
@@ -563,7 +651,6 @@ try {
   ];
 
   if($reviewHasDetail && $reviewHasRating && $hasBD && $equipJoin !== "" && $equipName !== ""){
-    // total reviews (ตาม filters + paid/not-cancelled จาก bookings)
     $st=$conn->prepare("
       SELECT COUNT(*) AS c, AVG(r.rating) AS a
       FROM review r
@@ -652,8 +739,11 @@ try {
     "daily_usage"=>$daily_usage,
 
     "member_tier_summary"=>$member_tier_summary,
-    "payment_method_summary"=>$payment_method_summary,
 
+    // ✅ เพิ่มให้หน้า users ใช้ได้จริง
+    "student_coupon_top"=>$student_coupon_top,
+
+    "payment_method_summary"=>$payment_method_summary,
     "equipment_ratings"=>$equipment_ratings
   ], JSON_UNESCAPED_UNICODE);
 
