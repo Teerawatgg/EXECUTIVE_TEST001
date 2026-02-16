@@ -21,7 +21,6 @@
         <small>Sports Equipment Rental System</small>
       </div>
 
-      <!-- ✅ ให้ตรงกับ executive.css -->
       <div class="staff-zone">
         <a href="profile.html" class="pill-btn" title="โปรไฟล์">
           <span class="pill-ic">👤</span>โปรไฟล์
@@ -39,7 +38,6 @@
     </div>
   </header>
 
-  <!-- ✅ executive.css กำหนดความกว้าง/ระยะที่ .container -->
   <div class="container">
     <div class="exec-layout">
       <!-- FILTER -->
@@ -96,13 +94,26 @@
             </select>
           </div>
 
+          <!-- ✅ เปลี่ยนเป็น RADIO: ทั้งหมด / Walk-in / Online -->
           <div class="filter-section">
             <div class="filter-h">ช่องทางการจอง</div>
-            <label class="check-row"><input id="chWalkin" type="checkbox" checked><span>Walk-in</span></label>
-            <label class="check-row"><input id="chOnline" type="checkbox" checked><span>Online</span></label>
+
+            <label class="radio-row">
+              <input type="radio" name="channelMode" value="ALL" checked>
+              <span>ทั้งหมด</span>
+            </label>
+
+            <label class="radio-row">
+              <input type="radio" name="channelMode" value="WALKIN">
+              <span>Walk-in</span>
+            </label>
+
+            <label class="radio-row">
+              <input type="radio" name="channelMode" value="ONLINE">
+              <span>Online</span>
+            </label>
           </div>
 
-          <!-- ✅ เหลือแค่ปุ่ม รีเซ็ต -->
           <div class="filter-actions">
             <button id="btnReset" class="btn-primary" type="button">รีเซ็ต</button>
           </div>
@@ -204,20 +215,18 @@
         <section class="grid-2" style="grid-template-columns:1fr 420px;">
           <div class="card">
             <div class="panel-header">
-              <div class="panel-title">การเช่าตามช่องทาง (รายวัน)</div>
+              <div class="panel-title">การเช่าตามช่องทางการเช่า (Walk-in และ Online)</div>
             </div>
             <div class="chart-wrap"><canvas id="chartChannelDaily"></canvas></div>
 
             <div class="panel-subtitle" style="margin-top:10px;">
-              <div>• เว็บไซต์: <span id="sumOnline">-</span> เฉลี่ย/วัน</div>
-              <div>• เคาน์เตอร์หน้าร้าน: <span id="sumWalkin">-</span> เฉลี่ย/วัน</div>
+              <div>• Online: <span id="sumOnline">-</span> เฉลี่ย/วัน</div>
+              <div>• Walk-in: <span id="sumWalkin">-</span> เฉลี่ย/วัน</div>
             </div>
           </div>
 
           <div class="card">
             <div style="font-weight:900;padding-bottom:10px;border-bottom:1px solid #eef0f4;">อุปกรณ์ยอดนิยม Top 5</div>
-
-            <!-- ✅ ใช้ topList (ตาม executive.css) -->
             <div id="topEquipmentList" class="topList">
               <div style="color:#6b7280;font-weight:900;">กำลังโหลด...</div>
             </div>
