@@ -1,0 +1,240 @@
+/* equipment-status.css (NEW) */
+/* ใช้ร่วมกับ executive.css + users-extend.css */
+
+/* =========================
+   Base helpers
+========================= */
+:root{
+  --es-border: #eef0f4;
+  --es-muted: #6b7280;
+  --es-bg-soft: #f6f7fb;
+  --es-pill: #f3f4f6;
+  --es-radius: 18px;
+}
+
+.muted,
+.muted-placeholder{
+  color: var(--es-muted);
+  font-weight: 800;
+}
+
+.es-spacer{ height: 10px; }
+
+/* =========================
+   Filter: Category checklist
+========================= */
+#categoryFilters{
+  display: grid;
+  gap: 10px;
+}
+
+.check-row{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--es-border);
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+  user-select: none;
+}
+
+.check-row:hover{
+  background: #fafafa;
+}
+
+.check-row input[type="checkbox"]{
+  width: 16px;
+  height: 16px;
+}
+
+/* =========================
+   KPI grid tweak for this page
+   (แก้บั๊ก/จัดสมดุล 6 กล่อง)
+========================= */
+.kpi-grid.kpi-grid-3{
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 1100px){
+  .kpi-grid.kpi-grid-3{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px){
+  .kpi-grid.kpi-grid-3{
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================
+   Chart area
+========================= */
+.chart-wrap{
+  border-radius: var(--es-radius);
+}
+
+.chart-wrap canvas{
+  width:100% !important;
+  height:100% !important;
+}
+
+/* =========================
+   Top 5 List (ให้เหมือนหน้าเพื่อน)
+========================= */
+.topList{
+  display: grid;
+  gap: 12px;
+}
+
+.topItem{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 12px;
+  padding: 14px 14px;
+  border: 1px solid var(--es-border);
+  border-radius: var(--es-radius);
+  background: #fff;
+}
+
+.topLeft{
+  display:flex;
+  align-items:center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.rank{
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: #fff4e8;
+  border: 1px solid #ffd4a8;
+  color: #ff7a00;
+  font-weight: 900;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex: 0 0 auto;
+}
+
+.topName{
+  font-weight: 900;
+  font-size: 16px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+}
+
+.topSub{
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--es-muted);
+}
+
+.badgeRed{
+  min-width: 46px;
+  height: 34px;
+  border-radius: 999px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight: 900;
+  color: #b91c1c;
+  background: #ffecec;
+  border: 1px solid #ffc7c7;
+  padding: 0 12px;
+}
+
+/* =========================
+   Grouped tables
+========================= */
+#groupTables{
+  display: grid;
+  gap: 16px;
+}
+
+.es-group-card{
+  border: 1px solid var(--es-border);
+  border-radius: var(--es-radius);
+  background: #fff;
+  overflow: hidden;
+}
+
+.es-group-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  font-weight: 900;
+  background: #fafafa;
+  border-bottom: 1px solid var(--es-border);
+}
+
+.es-group-count{
+  color: var(--es-muted);
+  font-weight: 900;
+}
+
+.es-table-wrap{
+  width:100%;
+  overflow:auto;
+}
+
+.es-table{
+  width:100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 760px; /* กันตารางบีบจนแปลก */
+}
+
+.es-table thead th{
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+  border-bottom: 1px solid var(--es-border);
+  padding: 12px 12px;
+  text-align: left;
+  font-weight: 900;
+  font-size: 13px;
+  color: #111827;
+  white-space: nowrap;
+}
+
+.es-table tbody td{
+  padding: 12px 12px;
+  border-bottom: 1px solid var(--es-border);
+  font-weight: 800;
+  font-size: 13px;
+  color: #111827;
+  white-space: nowrap;
+}
+
+.es-table tbody tr:nth-child(even){
+  background: #fbfbfd;
+}
+
+.es-td-strong{
+  font-weight: 900;
+}
+
+/* =========================
+   Small screen polish
+========================= */
+@media (max-width: 900px){
+  .topName{ max-width: 220px; }
+}
+
+@media (max-width: 520px){
+  .rank{ width: 40px; height: 40px; border-radius: 12px; }
+  .topItem{ padding: 12px; border-radius: 16px; }
+  .badgeRed{ height: 32px; }
+}

@@ -1,10 +1,8 @@
 /* ==========================
-   Executive Dashboard - index.js (FIXED v2)
-   ✅ แก้กราฟวงกลมไม่แสดงเมื่อกลับมาหน้าเดิม / canvas หาย
-      - ไม่ replace parentElement.innerHTML
-      - มี Empty State overlay
-      - ถ้า canvas ถูกลบ (จากโค้ดเก่า) => สร้างกลับมาใหม่อัตโนมัติ
-      - pageshow(bfcache) + visibilitychange => reload/redraw
+   Executive Dashboard - index.js (FIXED v3)
+   ✅ ยึดโครงตาม executive.css (topList / badgeRed)
+   ✅ เหลือปุ่มรีเซ็ตปุ่มเดียว (ลบ btnApply)
+   ✅ กันกราฟวงกลมไม่ขึ้นเวลา back/กลับหน้าเดิม
 ========================== */
 
 let chartTrend = null;
@@ -74,29 +72,24 @@ function ensureCanvasEmptyState(canvas, message = "ไม่พบข้อม�
   return empty;
 }
 
-/* ✅ สำคัญ: ถ้า canvas ถูกลบไป (จากโค้ดเก่า) ให้สร้างกลับมา */
+/* ✅ ถ้า canvas ถูกลบไป ให้สร้างกลับมา */
 function ensureEquipmentPieCanvas() {
   let c = $id("chartEquipmentPie");
   if (c) return c;
 
-  // โครงใน index.html คือ <div class="chart-wrap"><canvas id="chartEquipmentPie"></canvas></div>
-  // ถ้า canvas หาย ให้หา chart-wrap ของการใช้งานตามอุปกรณ์ แล้วสร้างใหม่
   const legend = $id("equipmentLegend");
   const wrap = legend ? legend.previousElementSibling : null;
 
   if (wrap && wrap.classList && wrap.classList.contains("chart-wrap")) {
     wrap.innerHTML = `<canvas id="chartEquipmentPie"></canvas>`;
-    c = $id("chartEquipmentPie");
-    return c;
+    return $id("chartEquipmentPie");
   }
 
-  // fallback เผื่อ structure เปลี่ยน: หา canvas-wrap แรกใน card นั้น
   const card = legend ? legend.closest(".card") : null;
   const wrap2 = card ? card.querySelector(".chart-wrap") : null;
   if (wrap2) {
     wrap2.innerHTML = `<canvas id="chartEquipmentPie"></canvas>`;
-    c = $id("chartEquipmentPie");
-    return c;
+    return $id("chartEquipmentPie");
   }
 
   return null;
@@ -105,7 +98,6 @@ function ensureEquipmentPieCanvas() {
 /* ==========================
    Filters
 ========================== */
-
 function getRangeValue() {
   const el = document.querySelector("input[name='range']:checked");
   return el ? el.value : "30d";
@@ -166,9 +158,7 @@ function bindFilterEvents() {
     el.addEventListener("change", autoApply);
   });
 
-  const btnApply = $id("btnApply");
-  if (btnApply) btnApply.addEventListener("click", loadAll);
-
+  // ✅ ไม่มี btnApply แล้ว
   const btnReset = $id("btnReset");
   if (btnReset) btnReset.addEventListener("click", () => location.reload());
 }
@@ -176,7 +166,6 @@ function bindFilterEvents() {
 /* ==========================
    Meta
 ========================== */
-
 async function loadMeta() {
   const meta = await apiGet("get_meta.php");
   if (!meta || !meta.success) return;
@@ -207,7 +196,6 @@ async function loadMeta() {
 /* ==========================
    KPI
 ========================== */
-
 async function loadKPI(params) {
   const kpi = await apiGet("get_dashboard_kpi.php", params);
   if (!kpi || !kpi.success) return;
@@ -226,7 +214,6 @@ async function loadKPI(params) {
 /* ==========================
    Payment
 ========================== */
-
 function renderPayList(items) {
   const wrap = $id("payCards");
   if (!wrap) return;
@@ -287,7 +274,6 @@ async function loadPayment(params) {
 /* ==========================
    Region Table
 ========================== */
-
 function renderRegionTable(rows) {
   const tb = $id("regionTbody");
   if (!tb) return;
@@ -315,7 +301,6 @@ async function loadRegion(params) {
 /* ==========================
    Trend
 ========================== */
-
 function drawTrend(payload) {
   const c = $id("chartTrend");
   if (!c) return;
@@ -367,9 +352,8 @@ async function loadTrend(params) {
 }
 
 /* ==========================
-   Equipment Pie ✅ FIXED v2
+   Top Equipment (Pie + Top 5)
 ========================== */
-
 function renderTopList(payload) {
   const wrap = $id("topEquipmentList");
   if (!wrap) return;
@@ -394,13 +378,14 @@ function renderTopList(payload) {
           <div class="topSub">${(it.category || it.type || "") ? (it.category || it.type) + " • " : ""}${fmtNum(it.count || 0)} ครั้ง</div>
         </div>
       </div>
-      <div class="badge">${it.status || "ยอดนิยม"}</div>
+
+      <!-- ✅ ใช้ badgeRed (ใน executive.css มีจริง) -->
+      <div class="badgeRed">${it.status || "ยอดนิยม"}</div>
     </div>
   `).join("");
 }
 
 function drawEquipmentPie(payload) {
-  // ✅ ถ้า canvas หาย ให้สร้างกลับมาก่อน
   const c = ensureEquipmentPieCanvas();
   if (!c) return;
 
@@ -447,7 +432,6 @@ function drawEquipmentPie(payload) {
     }
   });
 
-  // legend ใต้กราฟ
   const total = items.reduce((s, x) => s + Number(x.count || 0), 0) || 0;
   const legend = $id("equipmentLegend");
   if (legend) {
@@ -471,7 +455,6 @@ async function loadTopEquipment(params) {
 /* ==========================
    Channel Daily
 ========================== */
-
 function drawChannelDaily(payload) {
   const c = $id("chartChannelDaily");
   if (!c) return;
@@ -520,7 +503,6 @@ async function loadChannelDaily(params) {
 /* ==========================
    Legacy (ถ้ามี)
 ========================== */
-
 function drawLegacyBranchIfExists(rows) {
   const canvas = $id("chartBranch");
   if (!canvas || !window.Chart) return;
@@ -560,7 +542,6 @@ function drawLegacyPayPieIfExists(items) {
 /* ==========================
    Main load
 ========================== */
-
 async function loadAll() {
   const params = getFilters();
 
@@ -580,22 +561,14 @@ async function loadAll() {
 /* ==========================
    Buttons
 ========================== */
-
 function bindTopButtons() {
   const btnPrint = $id("btnPrint");
   if (btnPrint) btnPrint.addEventListener("click", () => window.print());
-
-  const btnLogout = $id("btnLogout");
-  if (btnLogout) btnLogout.addEventListener("click", async () => {
-    try { await apiGet("logout.php"); } catch {}
-    window.location.href = "login.html";
-  });
 }
 
 /* ==========================
    Fix: กลับมาหน้าเดิมแล้วกราฟหาย (bfcache/tab back)
 ========================== */
-
 window.addEventListener("pageshow", (e) => {
   if (e.persisted) {
     loadAll();
@@ -621,7 +594,6 @@ document.addEventListener("visibilitychange", () => {
 /* ==========================
    Init
 ========================== */
-
 document.addEventListener("DOMContentLoaded", async () => {
   setupCustomDateBox();
   bindFilterEvents();

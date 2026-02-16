@@ -5,19 +5,23 @@
   <title>Executive | ผู้ใช้</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+
   <link rel="stylesheet" href="css/executive.css" />
+  <link rel="stylesheet" href="css/users-extend.css" />
+
   <script src="executive-common.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
   <style>
     .panel-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;}
     .panel-header h3{margin:0;}
-    .print-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:999px;border:1px solid #dcd6f7;background:#f5f3ff;color:#5b21b6;font-weight:800;cursor:pointer;transition:.2s ease;white-space:nowrap;}
+    .print-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:999px;border:1px solid #dcd6f7;background:#f5f3ff;color:#5b21b6;font-weight:900;cursor:pointer;transition:.2s ease;white-space:nowrap;}
     .print-btn:hover{background:#ede9fe;transform:translateY(-1px);}
     .print-icon{font-size:16px;}
-
-    @media print{.print-btn,header,.sidebar,.chipRow{display:none!important;}body{background:#fff;}.panel{box-shadow:none;border:none;}}
+    @media print{.print-btn,header,.filter-panel,.chipRow{display:none!important;}body{background:#fff;}.panel{box-shadow:none;border:none;}}
 
     .chipRow{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 14px;}
     .chip{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;border:1px solid #eef0f4;background:#fff;font-weight:900;color:#111827;font-size:12px;box-shadow:0 8px 18px rgba(17,24,39,.06);}
@@ -47,20 +51,12 @@
     .seg button{border:1px solid #e5e7eb;background:#fff;padding:6px 10px;border-radius:999px;font-weight:900;cursor:pointer;font-size:12px;color:#111827;}
     .seg button.active{border-color:#22c55e;background:#dcfce7;color:#166534;}
 
-    .range-btns{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
-    .range-btn{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;font-weight:900;cursor:pointer;user-select:none;transition:.15s ease;}
-    .range-btn:hover{transform:translateY(-1px);}
-    .range-btn input{position:absolute;opacity:0;pointer-events:none;}
-    .dot{width:16px;height:16px;border-radius:999px;border:2px solid #cbd5e1;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;}
-    .dot::after{content:"";width:8px;height:8px;border-radius:999px;background:transparent;display:block;}
-    .range-btn:has(input:checked){border-color:#f97316;background:#ffedd5;color:#9a3412;}
-    .range-btn:has(input:checked) .dot{border-color:#f97316;}
-    .range-btn:has(input:checked) .dot::after{background:#f97316;}
-
     .list-radio{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
-    .item-radio{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #eef0f4;border-radius:12px;background:#fff;cursor:pointer;font-weight:900;}
+    .item-radio{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #eef0f4;border-radius:12px;background:#fff;cursor:pointer;font-weight:900;position:relative;}
     .item-radio:hover{background:#f9fafb;}
+    .item-radio input{position:absolute;opacity:0;pointer-events:none;}
     .item-radio small{margin-left:auto;color:#6b7280;font-weight:900;}
+    .item-radio:has(input:checked){border-color:#f97316;background:#fff7ed;color:#9a3412;}
 
     .tableWrap{overflow:auto;}
     table.mini{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;}
@@ -75,7 +71,6 @@
 </head>
 
 <body id="executiveUsers">
-
   <header class="main-header">
     <div class="header-top">
       <div class="brand">
@@ -83,8 +78,8 @@
         <small>Sports Equipment Rental System</small>
       </div>
       <div class="staff-zone">
-        <a class="pill-btn" href="profile.html">
-          <span class="pill-ic">👤</span> โปรไฟล์
+        <a href="profile.html" class="pill-btn" title="โปรไฟล์">
+          <span class="pill-ic">👤</span>โปรไฟล์
         </a>
       </div>
     </div>
@@ -99,216 +94,236 @@
   </header>
 
   <div class="container">
-    <aside class="sidebar">
+    <div class="exec-layout">
 
-      <section class="filter-block"><h4>ตัวกรอง</h4></section>
+      <!-- FILTER -->
+      <aside class="filter-panel">
+        <div class="filter-card">
+          <div class="filter-title">ตัวกรอง</div>
 
-      <section class="filter-block">
-        <h4>สาขา</h4>
-        <select id="branchSelect" class="time-select"><option value="ALL">ทั้งหมด</option></select>
-      </section>
-
-      <section class="filter-block">
-        <h4>ภูมิภาค</h4>
-        <select id="regionSelect" class="time-select"><option value="ALL">ทั้งหมด</option></select>
-      </section>
-
-      <section class="filter-block">
-        <h4>ปีการศึกษา</h4>
-        <select id="academicYear" class="time-select"><option value="ALL">ทั้งหมด</option></select>
-      </section>
-
-      <section class="filter-block">
-        <h4>ช่วงเวลา</h4>
-        <div class="range-btns">
-          <label class="range-btn"><span class="dot"></span><input type="radio" name="range" value="all" checked>ทั้งหมด</label>
-          <label class="range-btn"><span class="dot"></span><input type="radio" name="range" value="today">วันนี้</label>
-          <label class="range-btn"><span class="dot"></span><input type="radio" name="range" value="7d">7 วันที่ผ่านมา</label>
-          <label class="range-btn"><span class="dot"></span><input type="radio" name="range" value="30d">30 วันที่ผ่านมา</label>
-          <label class="range-btn"><span class="dot"></span><input type="radio" name="range" value="custom">กำหนดเอง</label>
-        </div>
-
-        <div id="customDateBox" style="display:none;margin-top:10px;">
-          <div style="display:flex;flex-direction:column;gap:8px;">
-            <input type="date" id="fromDate" class="time-select" />
-            <input type="date" id="toDate" class="time-select" />
-          </div>
-        </div>
-      </section>
-
-      <section class="filter-block">
-        <h4>คณะ</h4>
-        <div id="facultyList" class="list-radio"></div>
-      </section>
-
-      <section class="filter-block">
-        <h4>ชั้นปี</h4>
-        <div id="studyYearList" class="list-radio"></div>
-      </section>
-
-      <section class="filter-block">
-        <div class="actions">
-          <button class="btn primary" id="btnApply">ใช้ตัวกรอง</button>
-          <button class="btn" id="btnReset">รีเซ็ต</button>
-        </div>
-      </section>
-
-    </aside>
-
-    <main class="content">
-      <section class="panel">
-
-        <div class="panel-header">
-          <div>
-            <h3>ผู้ใช้</h3>
-            <div class="muted">ข้อมูลสำคัญที่ผู้บริหารต้องรู้จากพฤติกรรมการใช้งาน</div>
-          </div>
-          <button class="print-btn" onclick="window.print()"><span class="print-icon">🖨️</span> พิมพ์</button>
-        </div>
-
-        <div class="chipRow" id="filterChips"></div>
-
-        <div class="dash">
-
-          <!-- KPI -->
-          <div class="card" style="grid-column: span 4;">
-            <div class="ic">👥</div>
-            <div style="flex:1;">
-              <div class="t">จำนวนการเข้าใช้</div>
-              <div class="v" id="kpiTotalUsage">-</div>
-              <div class="s">ครั้ง</div>
+          <div class="filter-section">
+            <div class="filter-h">สาขา</div>
+            <select id="branchSelect" class="select">
+              <option value="ALL">ทั้งหมด</option>
+            </select>
+            <div class="panel-subtitle" style="margin-top:6px;">
+              * เลือก “สาขา” แล้วระบบจะปิดการเลือก “ภูมิภาค” อัตโนมัติ
             </div>
           </div>
 
-          <div class="card" style="grid-column: span 4;">
-            <div class="ic" style="background:#fff7ed;">📈</div>
-            <div style="flex:1;">
-              <div class="t">คณะใช้งานมากที่สุด</div>
-              <div class="v" id="kpiTopFacultyName">-</div>
-              <div class="s"><span id="kpiTopFacultyCount">-</span> ครั้ง</div>
-            </div>
+          <div class="filter-section">
+            <div class="filter-h">ภูมิภาค</div>
+            <select id="regionSelect" class="select">
+              <option value="ALL">ทั้งหมด</option>
+            </select>
           </div>
 
-          <div class="card" style="grid-column: span 4;">
-            <div class="ic" style="background:#ecfdf5;">📊</div>
-            <div style="flex:1;">
-              <div class="t">อัตราการใช้</div>
-              <div class="v"><span id="kpiUsageRate">-</span>%</div>
-              <div class="progress"><div id="kpiUsageBar"></div></div>
-            </div>
+          <div class="filter-section">
+            <div class="filter-h">ปีการศึกษา</div>
+            <select id="academicYear" class="select">
+              <option value="ALL">ทั้งหมด</option>
+            </select>
           </div>
 
-          <!-- Charts -->
-          <div class="panel-mini" style="grid-column: span 6;">
-            <h4>การใช้งานแยกตามคณะ</h4>
-            <div class="muted">จำนวนการเข้าใช้งาน (ตามตัวกรอง)</div>
-            <div class="chartBox"><canvas id="chartFaculty"></canvas></div>
-          </div>
+          <div class="filter-section">
+            <div class="filter-h">ช่วงเวลา</div>
 
-          <div class="panel-mini" style="grid-column: span 6;">
-            <h4>การใช้งานแยกตามชั้นปี</h4>
-            <div class="muted">จำนวนการเข้าใช้งาน (ตามตัวกรอง)</div>
-            <div class="chartBox"><canvas id="chartStudyYear"></canvas></div>
-          </div>
+            <label class="radio-row"><input type="radio" name="range" value="all" checked> <span>ทั้งหมด</span></label>
+            <label class="radio-row"><input type="radio" name="range" value="today"> <span>วันนี้</span></label>
+            <label class="radio-row"><input type="radio" name="range" value="7d"> <span>7 วันที่ผ่านมา</span></label>
+            <label class="radio-row"><input type="radio" name="range" value="30d"> <span>30 วันที่ผ่านมา</span></label>
+            <label class="radio-row"><input type="radio" name="range" value="custom"> <span>กำหนดเอง</span></label>
 
-          <!-- Member tier table -->
-          <div class="panel-mini" style="grid-column: span 6;">
-            <h4>ระดับสมาชิก: จำนวนการจอง & ยอดใช้จ่ายรวม</h4>
-            <div class="muted">ลูกค้าแต่ละระดับสมาชิกมีการจองทั้งหมดกี่ครั้ง และมียอดใช้จ่ายรวมเท่าใด</div>
-            <div class="tableWrap">
-              <table class="mini">
-                <thead>
-                  <tr>
-                    <th>ระดับสมาชิก</th>
-                    <th class="tr">จำนวนการจอง</th>
-                    <th class="tr">ยอดใช้จ่ายรวม</th>
-                  </tr>
-                </thead>
-                <tbody id="memberTierTbody">
-                  <tr><td colspan="3" style="color:#6b7280;font-weight:900;">กำลังโหลด...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Student coupon top -->
-          <div class="panel-mini" style="grid-column: span 6;">
-            <h4>คูปองยอดนิยมในกลุ่มนักศึกษา</h4>
-            <div class="muted">คูปองใดถูกนำมาใช้งานมากที่สุด (เฉพาะกลุ่มนักศึกษา)</div>
-            <div id="studentCouponTop" class="topList"></div>
-          </div>
-
-          <!-- Payment method summary -->
-          <div class="panel-mini" style="grid-column: span 6;">
-            <h4>ช่องทางชำระเงินของผู้ใช้</h4>
-            <div class="muted">จำนวนครั้งและยอดรวมตามช่องทางชำระเงิน</div>
-            <div class="tableWrap">
-              <table class="mini">
-                <thead>
-                  <tr>
-                    <th>ช่องทาง</th>
-                    <th class="tr">จำนวนครั้ง</th>
-                    <th class="tr">ยอดรวม</th>
-                  </tr>
-                </thead>
-                <tbody id="paymentMethodTbody">
-                  <tr><td colspan="3" style="color:#6b7280;font-weight:900;">กำลังโหลด...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Reviews -->
-          <div class="panel-mini" style="grid-column: span 6;">
-            <h4>รีวิวจากผู้ใช้</h4>
-            <div class="muted">สรุปคะแนนและรายการรีวิวล่าสุด</div>
-
-            <div class="chipRow" style="margin:0 0 10px;">
-              <div class="chip gray"><span class="k">จำนวนรีวิว:</span> <span class="v" id="rvTotal">0</span></div>
-              <div class="chip orange"><span class="k">คะแนนเฉลี่ย:</span> <span class="v" id="rvAvg">0.0</span></div>
-            </div>
-
-            <div class="tableWrap">
-              <table class="mini">
-                <thead>
-                  <tr>
-                    <th>วันที่</th>
-                    <th>ข้อความรีวิว</th>
-                    <th class="tr">คะแนน</th>
-                  </tr>
-                </thead>
-                <tbody id="recentReviewTbody">
-                  <tr><td colspan="3" style="color:#6b7280;font-weight:900;">กำลังโหลด...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Top equipment -->
-          <div class="panel-mini" style="grid-column: span 6;">
-            <h4>อุปกรณ์ยอดนิยม Top 5</h4>
-            <div class="muted">อุปกรณ์ที่ถูกยืมมากที่สุด (ตามตัวกรอง)</div>
-            <div class="topList" id="topEquipmentList"></div>
-          </div>
-
-          <!-- Peak/daily -->
-          <div class="panel-mini" style="grid-column: span 6;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
-              <div>
-                <h4 style="margin:0;">ช่วงเวลาการยืมสูงสุด</h4>
-                <div class="muted">เลือกดู “รายวัน” หรือ “ช่วงเวลาใช้งาน”</div>
+            <div class="date-box" id="customDateBox" style="display:none;">
+              <div class="date-row">
+                <div class="date-l">วันที่เริ่มต้น</div>
+                <input id="fromDate" type="date">
               </div>
-              <div class="seg">
-                <button id="btnDaily" type="button">รายวัน</button>
-                <button id="btnPeak" type="button" class="active">ช่วงเวลาใช้งาน</button>
+              <div class="date-row">
+                <div class="date-l">วันที่สิ้นสุด</div>
+                <input id="toDate" type="date">
               </div>
             </div>
-            <div class="chartBox small"><canvas id="chartPeak"></canvas></div>
+          </div>
+
+          <div class="filter-section">
+            <div class="filter-h">คณะ</div>
+            <div id="facultyList" class="list-radio">
+              <div class="muted-placeholder">กำลังโหลดรายการคณะ...</div>
+            </div>
+          </div>
+
+          <div class="filter-section">
+            <div class="filter-h">ชั้นปี</div>
+            <div id="studyYearList" class="list-radio">
+              <div class="muted-placeholder">กำลังโหลดรายการชั้นปี...</div>
+            </div>
+          </div>
+
+          <div class="filter-actions">
+            <button id="btnApply" class="btn-primary" type="button">ใช้ตัวกรอง</button>
+            <button id="btnReset" class="btn-primary" type="button" style="background:#111827;">รีเซ็ต</button>
           </div>
 
         </div>
-      </section>
-    </main>
+      </aside>
+
+      <!-- MAIN -->
+      <main class="exec-main" style="min-width:0;">
+        <section class="panel">
+
+          <div class="panel-header">
+            <div>
+              <h3>ผู้ใช้</h3>
+              <div class="muted">ข้อมูลสำคัญที่ผู้บริหารต้องรู้จากพฤติกรรมการใช้งาน</div>
+            </div>
+            <button class="print-btn" onclick="window.print()"><span class="print-icon">🖨️</span> พิมพ์</button>
+          </div>
+
+          <div class="chipRow" id="filterChips"></div>
+
+          <div class="dash">
+
+            <!-- KPI -->
+            <div class="card" style="grid-column: span 4;">
+              <div class="ic">👥</div>
+              <div style="flex:1;">
+                <div class="t">จำนวนการเข้าใช้</div>
+                <div class="v" id="kpiTotalUsage">-</div>
+                <div class="s">ครั้ง</div>
+              </div>
+            </div>
+
+            <div class="card" style="grid-column: span 4;">
+              <div class="ic" style="background:#fff7ed;">📈</div>
+              <div style="flex:1;">
+                <div class="t">คณะใช้งานมากที่สุด</div>
+                <div class="v" id="kpiTopFacultyName">-</div>
+                <div class="s"><span id="kpiTopFacultyCount">-</span> ครั้ง</div>
+              </div>
+            </div>
+
+            <div class="card" style="grid-column: span 4;">
+              <div class="ic" style="background:#ecfdf5;">📊</div>
+              <div style="flex:1;">
+                <div class="t">อัตราการใช้</div>
+                <div class="v"><span id="kpiUsageRate">-</span>%</div>
+                <div class="progress"><div id="kpiUsageBar"></div></div>
+              </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="panel-mini" style="grid-column: span 6;">
+              <h4>การใช้งานแยกตามคณะ</h4>
+              <div class="muted">จำนวนการเข้าใช้งาน (ตามตัวกรอง)</div>
+              <div class="chartBox"><canvas id="chartFaculty"></canvas></div>
+            </div>
+
+            <div class="panel-mini" style="grid-column: span 6;">
+              <h4>การใช้งานแยกตามชั้นปี</h4>
+              <div class="muted">จำนวนการเข้าใช้งาน (ตามตัวกรอง)</div>
+              <div class="chartBox"><canvas id="chartStudyYear"></canvas></div>
+            </div>
+
+            <!-- Member tier -->
+            <div class="panel-mini" style="grid-column: span 6;">
+              <h4>ระดับสมาชิก: จำนวนการจอง & ยอดใช้จ่ายรวม</h4>
+              <div class="muted">ลูกค้าแต่ละระดับสมาชิกมีการจองทั้งหมดกี่ครั้ง และมียอดใช้จ่ายรวมเท่าใด</div>
+              <div class="tableWrap">
+                <table class="mini">
+                  <thead>
+                    <tr>
+                      <th>ระดับสมาชิก</th>
+                      <th class="tr">จำนวนการจอง</th>
+                      <th class="tr">ยอดใช้จ่ายรวม</th>
+                    </tr>
+                  </thead>
+                  <tbody id="memberTierTbody">
+                    <tr><td colspan="3" style="color:#6b7280;font-weight:900;">กำลังโหลด...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Coupon top -->
+            <div class="panel-mini" style="grid-column: span 6;">
+              <h4>คูปองยอดนิยมในกลุ่มนักศึกษา</h4>
+              <div class="muted">คูปองใดถูกนำมาใช้งานมากที่สุด (เฉพาะกลุ่มนักศึกษา)</div>
+              <div id="studentCouponTop" class="topList"></div>
+            </div>
+
+            <!-- Payment -->
+            <div class="panel-mini" style="grid-column: span 6;">
+              <h4>ช่องทางชำระเงินของผู้ใช้</h4>
+              <div class="muted">จำนวนครั้งและยอดรวมตามช่องทางชำระเงิน</div>
+              <div class="tableWrap">
+                <table class="mini">
+                  <thead>
+                    <tr>
+                      <th>ช่องทาง</th>
+                      <th class="tr">จำนวนครั้ง</th>
+                      <th class="tr">ยอดรวม</th>
+                    </tr>
+                  </thead>
+                  <tbody id="paymentMethodTbody">
+                    <tr><td colspan="3" style="color:#6b7280;font-weight:900;">กำลังโหลด...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- ✅ Ratings by equipment (แทนรีวิวเดิม) -->
+            <div class="panel-mini" style="grid-column: span 6;">
+              <h4>การให้คะแนนอุปกรณ์จากผู้ใช้</h4>
+              <div class="muted">ผู้ใช้ให้คะแนนอุปกรณ์ไหน อย่างไรบ้าง (เฉลี่ย/จำนวน/คิดเป็น %)</div>
+
+              <div class="chipRow" style="margin:0 0 10px;">
+                <div class="chip gray"><span class="k">จำนวนรีวิว:</span> <span class="v" id="rvTotal">0</span></div>
+                <div class="chip orange"><span class="k">คะแนนเฉลี่ยรวม:</span> <span class="v" id="rvAvg">0.0</span></div>
+              </div>
+
+              <div class="tableWrap">
+                <table class="mini">
+                  <thead>
+                    <tr>
+                      <th>อุปกรณ์</th>
+                      <th class="tr">คะแนนเฉลี่ย</th>
+                      <th class="tr">สัดส่วน</th>
+                    </tr>
+                  </thead>
+                  <tbody id="equipmentRatingTbody">
+                    <tr><td colspan="3" style="color:#6b7280;font-weight:900;">กำลังโหลด...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Top equipment -->
+            <div class="panel-mini" style="grid-column: span 6;">
+              <h4>อุปกรณ์ยอดนิยม Top 5</h4>
+              <div class="muted">อุปกรณ์ที่ถูกยืมมากที่สุด (ตามตัวกรอง)</div>
+              <div class="topList" id="topEquipmentList"></div>
+            </div>
+
+            <!-- Peak/daily -->
+            <div class="panel-mini" style="grid-column: span 6;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+                <div>
+                  <h4 style="margin:0;">ช่วงเวลาการยืมสูงสุด</h4>
+                  <div class="muted">เลือกดู “รายวัน” หรือ “ช่วงเวลาใช้งาน”</div>
+                </div>
+                <div class="seg">
+                  <button id="btnDaily" type="button">รายวัน</button>
+                  <button id="btnPeak" type="button" class="active">ช่วงเวลาใช้งาน</button>
+                </div>
+              </div>
+              <div class="chartBox small"><canvas id="chartPeak"></canvas></div>
+            </div>
+
+          </div>
+        </section>
+      </main>
+    </div>
   </div>
 
   <script src="users.js"></script>

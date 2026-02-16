@@ -1,244 +1,212 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="th">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>สถานะอุปกรณ์ | Sports Equipment Rental System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>สถานะอุปกรณ์ | ระบบเช่าอุปกรณ์กีฬา</title>
 
-  <!-- Fonts + CSS -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
 
-  <!-- ใช้ CSS หลักของคุณ (ถ้ามี executive.css อยู่แล้วให้คงไว้) -->
-  <link rel="stylesheet" href="executive.css?v=1" />
-
-  <style>
-    :root{ --bg:#f5f7fb; --card:#fff; --line:#eef0f4; --text:#111827; --muted:#6b7280; --brand:#f97316; }
-    *{ box-sizing:border-box; }
-    body{ margin:0; font-family:"Noto Sans Thai",system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg); color:var(--text); }
-    a{ color:inherit; text-decoration:none; }
-
-    .wrap{ max-width:1200px; margin:0 auto; padding:18px; }
-    .topbar{
-      display:flex; align-items:center; justify-content:space-between;
-      padding:14px 18px; background:#fff; border-bottom:1px solid var(--line);
-      position:sticky; top:0; z-index:50;
-    }
-    .brand{ display:flex; flex-direction:column; gap:2px; }
-    .brand .th{ font-weight:900; font-size:18px; }
-    .brand .en{ font-weight:700; color:var(--muted); font-size:12px; }
-
-    .profile-btn{
-      display:flex; align-items:center; gap:10px;
-      padding:10px 14px; border:1px solid var(--line);
-      border-radius:999px; background:#fff; font-weight:900;
-    }
-    .profile-dot{ width:26px; height:26px; border-radius:999px; background:#f3f4f6; display:grid; place-items:center; }
-
-    .nav{
-      display:flex; gap:10px; padding:14px 18px; background:#fff; border-bottom:1px solid var(--line);
-    }
-    .nav a{
-      padding:10px 14px; border-radius:999px; font-weight:900; color:#111827;
-    }
-    .nav a.active{ background:#fff7ed; color:var(--brand); border:1px solid #fed7aa; }
-
-    .panel-header{
-      display:flex; align-items:center; justify-content:space-between;
-      margin:18px 0 12px;
-    }
-    .panel-header h3{ margin:0; font-size:22px; font-weight:900; }
-    .muted{ color:var(--muted); font-weight:800; font-size:13px; margin-top:4px; }
-
-    .print-btn{
-      border:1px solid #ddd6fe; color:#4c1d95;
-      background:#f5f3ff; font-weight:900;
-      padding:10px 14px; border-radius:999px;
-      cursor:pointer;
-    }
-
-    .grid{
-      display:grid; grid-template-columns: 320px 1fr 360px;
-      gap:16px;
-    }
-    @media (max-width: 1080px){
-      .grid{ grid-template-columns: 1fr; }
-    }
-
-    .card{
-      background:var(--card);
-      border:1px solid var(--line);
-      border-radius:18px;
-      padding:14px;
-      box-shadow: 0 6px 18px rgba(17,24,39,.04);
-    }
-    .card h4{ margin:0 0 8px; font-size:16px; font-weight:900; }
-    .card .sub{ color:var(--muted); font-weight:800; font-size:12px; margin:0 0 8px; }
-
-    .filter-title{ font-weight:900; margin:0 0 8px; }
-    .input, select{
-      width:100%;
-      border:1px solid var(--line);
-      border-radius:14px;
-      padding:12px 12px;
-      background:#fff;
-      font-weight:800;
-      outline:none;
-    }
-
-    /* ✅ การ์ดสถิติด้านบน: 6 ใบ (เพิ่มกำลังใช้งาน) */
-    .stats-grid{
-      display:grid;
-      grid-template-columns: repeat(6, minmax(0,1fr));
-      gap:12px;
-      margin-top:10px;
-    }
-    @media (max-width: 1080px){
-      .stats-grid{ grid-template-columns: repeat(2, minmax(0,1fr)); }
-    }
-    .stat-card{
-      background:#fff;
-      border:1px solid var(--line);
-      border-radius:16px;
-      padding:12px 14px;
-    }
-    .stat-title{ font-weight:900; font-size:12px; color:var(--muted); }
-    .stat-value{ font-weight:900; font-size:20px; margin-top:4px; }
-
-    .chart-box{ height:320px; }
-    @media (max-width: 1080px){ .chart-box{ height:260px; } }
-
-    .section-title{ margin:18px 0 10px; font-size:18px; font-weight:900; }
-
-    /* print */
-    @media print{
-      .topbar,.nav,.print-btn{ display:none !important; }
-      body{ background:#fff; }
-      .wrap{ max-width:none; padding:0; }
-      .card{ box-shadow:none; }
-    }
-  </style>
+  <link rel="stylesheet" href="css/executive.css?v=5" />
+  <link rel="stylesheet" href="css/users-extend.css?v=5" />
+  <link rel="stylesheet" href="css/equipment-status.css?v=5" />
 </head>
 
 <body>
-  <!-- Top bar -->
-  <div class="topbar">
-    <div class="brand">
-      <div class="th">ระบบเช่าอุปกรณ์กีฬา</div>
-      <div class="en">Sports Equipment Rental System</div>
-    </div>
-
-    <a class="profile-btn" href="profile.html" title="โปรไฟล์">
-      <span class="profile-dot">👤</span>
-      โปรไฟล์
-    </a>
-  </div>
-
-  <!-- Nav -->
-  <div class="nav">
-    <a href="index.html">ภาพรวม</a>
-    <a href="users.html">ผู้ใช้</a>
-    <a href="equipment.html">อุปกรณ์</a>
-    <a class="active" href="equipment-status.html">สถานะอุปกรณ์</a>
-  </div>
-
-  <div class="wrap">
-    <!-- Header -->
-    <div class="panel-header">
-      <div>
-        <h3>สถานะอุปกรณ์</h3>
-        <div class="muted">ติดตามสถานะและปัญหาของอุปกรณ์กีฬาทั้งหมด</div>
-      </div>
-      <button class="print-btn" onclick="window.print()">
-        <span class="print-icon">🖨️</span> พิมพ์
-      </button>
-    </div>
-
-    <!-- ✅ Stats -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-title">อุปกรณ์ทั้งหมด</div>
-        <div class="stat-value" id="cTotal">-</div>
+  <!-- HEADER -->
+  <header class="main-header">
+    <div class="header-top">
+      <div class="brand">
+        <span class="brand-name">ระบบเช่าอุปกรณ์กีฬา</span>
+        <small>Sports Equipment Rental System</small>
       </div>
 
-      <div class="stat-card">
-        <div class="stat-title">พร้อมใช้งาน</div>
-        <div class="stat-value" id="cReady">-</div>
-      </div>
-
-      <!-- ✅ เพิ่มใหม่ -->
-      <div class="stat-card">
-        <div class="stat-title">กำลังใช้งาน</div>
-        <div class="stat-value" id="cInUse">-</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-title">เสื่อมสภาพ</div>
-        <div class="stat-value" id="cWorn">-</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-title">ชำรุด</div>
-        <div class="stat-value" id="cBroken">-</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-title">กำลังซ่อมแซม</div>
-        <div class="stat-value" id="cMaint">-</div>
+      <div class="staff-zone">
+        <a href="profile.html" class="pill-btn" title="โปรไฟล์">
+          <span class="pill-ic">👤</span>โปรไฟล์
+        </a>
       </div>
     </div>
 
-    <!-- Main grid -->
-    <div class="grid" style="margin-top:14px;">
-      <!-- Filters -->
-      <div class="card">
-        <h4>ค้นหา</h4>
-        <div class="sub">ค้นหาจากรหัส/ชื่ออุปกรณ์</div>
-        <input class="input" id="qSearch" placeholder="ค้นหาอุปกรณ์..." />
+    <div class="header-bottom">
+      <nav class="main-nav">
+        <a href="index.html" class="nav-item">ภาพรวม</a>
+        <a href="users.html" class="nav-item">ผู้ใช้</a>
+        <a href="equipment.html" class="nav-item">อุปกรณ์</a>
+        <a href="equipment-status.html" class="nav-item active">สถานะอุปกรณ์</a>
+      </nav>
+    </div>
+  </header>
 
-        <div style="height:14px;"></div>
+  <div class="container">
+    <div class="exec-layout">
 
-        <div class="filter-title">สาขา</div>
-        <select id="branchSelect">
-          <option value="ALL">ทั้งหมด</option>
-        </select>
+      <!-- SIDEBAR -->
+      <aside class="filter-panel">
+        <div class="filter-card">
+          <div class="filter-title">ตัวกรอง</div>
 
-        <div style="height:14px;"></div>
+          <div class="filter-section">
+            <div class="filter-h">ค้นหา</div>
+            <div class="panel-subtitle" style="margin:0 0 8px;">ค้นหาจากรหัส/ชื่ออุปกรณ์</div>
+            <input id="qSearch" class="select" type="text" placeholder="ค้นหาอุปกรณ์..." />
+          </div>
 
-        <div class="filter-title">หมวดหมู่อุปกรณ์</div>
-        <div id="categoryFilters" style="margin-top:8px;"></div>
-      </div>
+          <div class="filter-section">
+            <div class="filter-h">สาขา</div>
+            <select id="branchSelect" class="select">
+              <option value="ALL">ทั้งหมด</option>
+            </select>
+          </div>
 
-      <!-- Chart -->
-      <div class="card">
-        <h4>สถานะแยกตามประเภทอุปกรณ์</h4>
-        <div class="sub">แสดงแบบกราฟแท่งซ้อนตามสถานะ</div>
-        <div class="chart-box">
-          <canvas id="chartStack"></canvas>
+          <div class="filter-section">
+            <div class="filter-h">หมวดหมู่อุปกรณ์</div>
+            <div id="categoryFilters" style="margin-top:6px;">
+              <div style="color:#6b7280;font-weight:900;">กำลังโหลด...</div>
+            </div>
+          </div>
+
+          <div class="filter-actions">
+            <button id="btnReset" class="btn-primary" type="button">รีเซ็ต</button>
+          </div>
         </div>
-      </div>
+      </aside>
 
-      <!-- Top 5 -->
-      <div class="card">
-        <h4 id="top5Title">อุปกรณ์ที่มีปัญหาบ่อย Top 5</h4>
-        <div class="sub">หากไม่มีสถานะเสีย/ซ่อม ระบบจะแสดง Top 5 “ถูกใช้งานมากสุด” แทน</div>
-        <div id="top5List"></div>
-      </div>
-    </div>
+      <!-- MAIN -->
+      <main class="exec-main" style="min-width:0;">
 
-    <!-- Group tables -->
-    <div class="card" style="margin-top:16px;">
-      <div class="section-title">รายการอุปกรณ์ (แยกตามหมวดหมู่)</div>
-      <div class="sub">ตารางจะแยกเป็นกลุ่มหมวดหมู่</div>
-      <div id="groupTables" style="margin-top:10px;"></div>
+        <!-- KPI + HEADER -->
+        <section class="card">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">สถานะอุปกรณ์</div>
+              <div class="panel-subtitle">ติดตามสถานะและปัญหาของอุปกรณ์กีฬาทั้งหมด</div>
+            </div>
+
+            <div style="display:flex;gap:10px;">
+              <button class="pill-btn pill-print" type="button" onclick="window.print()">
+                <span class="pill-ic">🖨️</span>พิมพ์
+              </button>
+            </div>
+          </div>
+
+          <!-- ✅ FIX: บังคับเป็น 3 คอลัมน์ เพื่อให้ 6 กล่องสมดุล (3x2) -->
+          <div class="kpi-grid" style="grid-template-columns:repeat(3, minmax(0, 1fr));">
+            <div class="kpi">
+              <div>
+                <div class="kpi-label">อุปกรณ์ทั้งหมด</div>
+                <div class="kpi-value" id="cTotal">-</div>
+              </div>
+            </div>
+
+            <div class="kpi">
+              <div>
+                <div class="kpi-label">พร้อมใช้งาน</div>
+                <div class="kpi-value" id="cReady">-</div>
+              </div>
+            </div>
+
+            <div class="kpi">
+              <div>
+                <div class="kpi-label">กำลังใช้งาน</div>
+                <div class="kpi-value" id="cInUse">-</div>
+              </div>
+            </div>
+
+            <div class="kpi">
+              <div>
+                <div class="kpi-label">เสื่อมสภาพ</div>
+                <div class="kpi-value" id="cWorn">-</div>
+              </div>
+            </div>
+
+            <div class="kpi">
+              <div>
+                <div class="kpi-label">ชำรุด</div>
+                <div class="kpi-value" id="cBroken">-</div>
+              </div>
+            </div>
+
+            <div class="kpi">
+              <div>
+                <div class="kpi-label">กำลังซ่อมแซม</div>
+                <div class="kpi-value" id="cMaint">-</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- CHART + TOP5 -->
+        <section class="grid-2" style="grid-template-columns:1fr 420px;">
+          <div class="card">
+            <div class="panel-header">
+              <div class="panel-title">สถานะแยกตามประเภทอุปกรณ์</div>
+            </div>
+            <div class="chart-wrap" style="height:320px;">
+              <canvas id="chartStack"></canvas>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="font-weight:900;padding-bottom:10px;border-bottom:1px solid #eef0f4;">
+              <span id="top5Title">อุปกรณ์ที่มีปัญหาบ่อย Top 5</span>
+            </div>
+
+            <div id="top5List" class="topList" style="padding-top:10px;">
+              <div style="color:#6b7280;font-weight:900;">กำลังโหลด...</div>
+            </div>
+
+            <div class="panel-subtitle" style="margin-top:10px;">
+              หากไม่มีสถานะเสีย/ซ่อม ระบบจะแสดง Top 5 “ถูกใช้งานมากสุด” แทน
+            </div>
+          </div>
+        </section>
+
+        <!-- GROUP TABLES -->
+        <section class="card">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">รายการอุปกรณ์ (แยกตามหมวดหมู่)</div>
+              <div class="panel-subtitle">ตารางจะแสดงรายการอุปกรณ์ตามตัวกรองที่เลือก</div>
+            </div>
+          </div>
+
+          <div id="groupTables">
+            <div style="color:#6b7280;font-weight:900;">กำลังโหลด...</div>
+          </div>
+        </section>
+
+      </main>
     </div>
   </div>
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="executive-common.js"></script>
+  <script src="equipment-status.js?v=5"></script>
 
-  <!-- Page JS -->
-  <script src="equipment-status.js?v=1"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const btn = document.getElementById("btnReset");
+      if (!btn) return;
+
+      btn.addEventListener("click", () => {
+        const q = document.getElementById("qSearch");
+        const b = document.getElementById("branchSelect");
+        if (q) q.value = "";
+        if (b) b.value = "ALL";
+
+        const wrap = document.getElementById("categoryFilters");
+        if (wrap) {
+          wrap.querySelectorAll('input[type="checkbox"][data-cat]').forEach(cb => cb.checked = true);
+          wrap.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+
+        if (q) q.dispatchEvent(new Event("input", { bubbles: true }));
+        if (b) b.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    });
+  </script>
 </body>
 </html>

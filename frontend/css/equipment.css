@@ -1,0 +1,168 @@
+/* =========================
+   equipment.css (NEW)
+   ใช้ร่วมกับ:
+   - executive.css
+   - users-extend.css
+   - equipment-status.css
+========================= */
+
+:root{
+  --eq-border:#eef0f4;
+  --eq-muted:#6b7280;
+  --eq-radius:18px;
+}
+
+/* ให้ placeholder ดูเหมือนกันทุกหน้า */
+.muted-placeholder{
+  color: var(--eq-muted);
+  font-weight: 900;
+  font-size: 12px;
+  padding: 6px 2px;
+}
+
+/* -------------------------
+   KPI row (ปรับนิดให้แน่น)
+------------------------- */
+.equip-kpi-grid{
+  margin-top: 8px;
+}
+@media (max-width:1100px){
+  .equip-kpi-grid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width:640px){
+  .equip-kpi-grid{ grid-template-columns: 1fr; }
+}
+
+/* -------------------------
+   Filter list rows (category/status)
+   (ใช้แนวเดียวกับ equipment-status.css)
+------------------------- */
+.checkList{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  margin-top:8px;
+}
+
+/* equipment.js renderCategories/renderStatuses ใช้ class เหล่านี้ */
+.chkRow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:10px 12px;
+  border:1px solid var(--eq-border);
+  border-radius:14px;
+  background:#fff;
+  transition:filter .12s ease, border-color .12s ease;
+}
+.chkRow:hover{
+  filter:brightness(.99);
+  border-color:#e5e7eb;
+}
+
+.chkLeft{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  cursor:pointer;
+  font-weight:800;
+  color:#111827;
+  user-select:none;
+}
+.chkLeft input{
+  width:16px;
+  height:16px;
+}
+
+.chkCount{
+  font-size:12px;
+  font-weight:900;
+  color: var(--eq-muted);
+  background:#f3f4f6;
+  border:1px solid #e5e7eb;
+  padding:2px 10px;
+  border-radius:999px;
+  min-width:44px;
+  text-align:center;
+}
+
+/* -------------------------
+   Groups card/table
+------------------------- */
+.equip-groups{
+  margin-top: 16px;
+  display:grid;
+  gap: 14px;
+}
+
+/* ใน equipment.js จะสร้าง .group/.groupHead/.tableWrap/.table */
+.group{
+  background:#fff;
+  border:1px solid var(--eq-border);
+  border-radius: var(--eq-radius);
+  overflow:hidden;
+}
+
+.groupHead{
+  padding:12px 14px;
+  border-bottom:1px solid var(--eq-border);
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:12px;
+  background:#fafafa;
+}
+.groupHead .name{
+  font-weight:900;
+}
+.groupHead .sub{
+  color:var(--eq-muted);
+  font-weight:900;
+  font-size:12px;
+}
+
+.tableWrap{
+  width:100%;
+  overflow:auto;
+}
+
+/* ใช้ .table ของ executive.css เป็นหลัก
+   แต่ล็อค min-width กันตารางบีบจนเพี้ยน (เหมือน equipment-status.css)
+*/
+.table{
+  min-width: 760px;
+}
+
+/* td helper จากไฟล์เดิม (รองรับที่ equipment.js ใส่ class tdC/tdR) */
+.tdC{ text-align:center; }
+.tdR{ text-align:right; }
+
+/* -------------------------
+   Pills (สถานะ)
+------------------------- */
+.pill{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:4px 10px;
+  border-radius:999px;
+  font-weight:900;
+  font-size:12px;
+  border:1px solid transparent;
+  white-space:nowrap;
+}
+.pill.ok{ background:#ecfdf5; color:#065f46; border-color:#a7f3d0; }
+.pill.use{ background:#eff6ff; color:#1d4ed8; border-color:#bfdbfe; }
+.pill.bad{ background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
+.pill.maint{ background:#fffbeb; color:#92400e; border-color:#fde68a; }
+.pill.muted{ background:#f3f4f6; color:#374151; border-color:#e5e7eb; }
+
+/* -------------------------
+   Print: ซ่อน filter เหมือนหน้าอื่น
+------------------------- */
+@media print{
+  .filter-panel, header{ display:none !important; }
+  body{ background:#fff; }
+  .card, .group{ border:none !important; box-shadow:none !important; }
+}

@@ -1,0 +1,79 @@
+/* users-extend.css - เพิ่มจาก executive.css สำหรับหน้า users */
+
+/* ทำให้ select ดู disabled ชัดเจน */
+.time-select.disabled,
+select.disabled {
+  opacity: .6;
+  cursor: not-allowed;
+  background: #f9fafb !important;
+}
+
+/* ข้อความ hint ใต้สาขา */
+.hint-branch-primary{
+  margin-top:8px;
+  font-size:11px;
+  font-weight:900;
+  color:#6b7280;
+}
+
+/* placeholder ใน radio list */
+.muted-placeholder{
+  color:#6b7280;
+  font-weight:900;
+  font-size:12px;
+  padding:6px 2px;
+}
+
+/* ให้ list-radio มีสกอร์ลได้ ถ้ารายการเยอะ */
+.list-radio{
+  max-height: 260px;
+  overflow:auto;
+  padding-right: 2px;
+}
+
+/* scrollbar (optional) */
+.list-radio::-webkit-scrollbar{ width:10px; }
+.list-radio::-webkit-scrollbar-thumb{
+  background:#e5e7eb;
+  border-radius:999px;
+  border: 2px solid #fff;
+}
+
+/* =========================
+   ✅ FIX: ตาราง 3 คอลัมน์ให้ตรงกันทุกการ์ด
+========================= */
+table.mini{
+  width:100%;
+  table-layout: fixed; /* ✅ ล็อคคอลัมน์ให้เหมือนกัน */
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+table.mini th,
+table.mini td{
+  overflow:hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 3 คอลัมน์: ซ้ายกว้างสุด / ตัวเลข 2 ช่องชิดขวา */
+table.mini thead th:nth-child(1),
+table.mini tbody td:nth-child(1){
+  width:45%;
+  text-align:left;
+}
+
+table.mini thead th:nth-child(2),
+table.mini tbody td:nth-child(2){
+  width:27.5%;
+  text-align:right;
+}
+
+table.mini thead th:nth-child(3),
+table.mini tbody td:nth-child(3){
+  width:27.5%;
+  text-align:right;
+}
+
+/* ให้ class tr มีผลทั้ง th/td */
+table.mini .tr{ text-align:right; }
