@@ -13,8 +13,6 @@
   <link rel="stylesheet" href="css/executive.css" />
   <link rel="stylesheet" href="css/users-extend.css" />
   <link rel="stylesheet" href="css/equipment-status.css" />
-
-  <!-- ✅ new: equipment page styles -->
   <link rel="stylesheet" href="css/equipment.css" />
 
   <script src="executive-common.js"></script>
@@ -46,7 +44,7 @@
 
   <div class="container">
     <div class="exec-layout">
-      <!-- ✅ FILTER (match index.html) -->
+      <!-- FILTER -->
       <aside class="filter-panel">
         <div class="filter-card">
           <div class="filter-title">ตัวกรอง</div>
@@ -72,6 +70,7 @@
 
           <div class="filter-section">
             <div class="filter-h">หมวดหมู่อุปกรณ์</div>
+            <!-- ✅ เดิมเป็น checkList เหมือนเดิม แต่ CSS จะทำให้เลื่อนได้ -->
             <div id="catList" class="checkList">
               <div class="muted-placeholder">กำลังโหลด...</div>
             </div>
@@ -107,36 +106,12 @@
 
           <!-- KPI -->
           <div class="kpi-grid equip-kpi-grid">
-            <div class="kpi">
-              <div>
-                <div class="kpi-label">อุปกรณ์ทั้งหมด</div>
-                <div class="kpi-value" id="kpiTotal">-</div>
-              </div>
-            </div>
-
-            <div class="kpi">
-              <div>
-                <div class="kpi-label">ว่าง</div>
-                <div class="kpi-value" id="kpiAvailable">-</div>
-              </div>
-            </div>
-
-            <div class="kpi">
-              <div>
-                <div class="kpi-label">กำลังใช้งาน</div>
-                <div class="kpi-value" id="kpiInUse">-</div>
-              </div>
-            </div>
-
-            <div class="kpi">
-              <div>
-                <div class="kpi-label">ชำรุด</div>
-                <div class="kpi-value" id="kpiBroken">-</div>
-              </div>
-            </div>
+            <div class="kpi"><div><div class="kpi-label">อุปกรณ์ทั้งหมด</div><div class="kpi-value" id="kpiTotal">-</div></div></div>
+            <div class="kpi"><div><div class="kpi-label">ว่าง</div><div class="kpi-value" id="kpiAvailable">-</div></div></div>
+            <div class="kpi"><div><div class="kpi-label">กำลังใช้งาน</div><div class="kpi-value" id="kpiInUse">-</div></div></div>
+            <div class="kpi"><div><div class="kpi-label">ชำรุด</div><div class="kpi-value" id="kpiBroken">-</div></div></div>
           </div>
 
-          <!-- Groups -->
           <div id="groupsWrap" class="equip-groups">
             <div class="muted-placeholder">กำลังโหลด...</div>
           </div>

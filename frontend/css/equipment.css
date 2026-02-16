@@ -1,5 +1,5 @@
 /* =========================
-   equipment.css (NEW)
+   equipment.css (UPDATED)
    ใช้ร่วมกับ:
    - executive.css
    - users-extend.css
@@ -35,13 +35,42 @@
 
 /* -------------------------
    Filter list rows (category/status)
-   (ใช้แนวเดียวกับ equipment-status.css)
 ------------------------- */
 .checkList{
   display:flex;
   flex-direction:column;
   gap:8px;
   margin-top:8px;
+}
+
+/* ✅ NEW: ทำให้ “หมวดหมู่อุปกรณ์” เลื่อนสกอเมาส์ได้ */
+#catList{
+  max-height: 240px;          /* ปรับได้: 200-320 แล้วแต่ชอบ */
+  overflow-y: auto;
+  padding-right: 6px;         /* กัน scrollbar ทับตัวเลข */
+  overscroll-behavior: contain;
+}
+
+/* scrollbar (Chrome/Edge) */
+#catList::-webkit-scrollbar{
+  width: 10px;
+}
+#catList::-webkit-scrollbar-track{
+  background: #f3f4f6;
+  border-radius: 999px;
+}
+#catList::-webkit-scrollbar-thumb{
+  background: #d1d5db;
+  border-radius: 999px;
+  border: 2px solid #f3f4f6;
+}
+#catList::-webkit-scrollbar-thumb:hover{
+  background: #cbd5e1;
+}
+
+/* ✅ กันพื้นที่ในมือถือไม่สูงเกิน */
+@media (max-width:640px){
+  #catList{ max-height: 200px; }
 }
 
 /* equipment.js renderCategories/renderStatuses ใช้ class เหล่านี้ */
@@ -96,7 +125,6 @@
   gap: 14px;
 }
 
-/* ใน equipment.js จะสร้าง .group/.groupHead/.tableWrap/.table */
 .group{
   background:#fff;
   border:1px solid var(--eq-border);
@@ -127,14 +155,10 @@
   overflow:auto;
 }
 
-/* ใช้ .table ของ executive.css เป็นหลัก
-   แต่ล็อค min-width กันตารางบีบจนเพี้ยน (เหมือน equipment-status.css)
-*/
 .table{
   min-width: 760px;
 }
 
-/* td helper จากไฟล์เดิม (รองรับที่ equipment.js ใส่ class tdC/tdR) */
 .tdC{ text-align:center; }
 .tdR{ text-align:right; }
 
@@ -165,4 +189,55 @@
   .filter-panel, header{ display:none !important; }
   body{ background:#fff; }
   .card, .group{ border:none !important; box-shadow:none !important; }
+}
+
+
+/* =========================
+   FIX: ทำให้แถบตัวกรองไม่เคลื่อนที่ (Sticky)
+========================= */
+
+/* ให้ layout รองรับ sticky */
+.exec-layout{
+  align-items: flex-start; /* สำคัญ: กัน sticky เพี้ยน */
+}
+
+/* ทำให้ filter ติดบน */
+.filter-panel{
+  position: sticky;
+  top: 16px;              /* ระยะห่างจากด้านบน (ปรับได้) */
+  align-self: flex-start; /* กันยืดตามความสูง */
+  height: calc(100vh - 32px);
+  overflow: hidden;       /* กันเลื่อนทั้ง panel */
+}
+
+/* ให้เลื่อนภายในเฉพาะ card ของตัวกรอง */
+.filter-card{
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 6px;     /* กัน scrollbar ทับ */
+  overscroll-behavior: contain;
+}
+
+/* scrollbar ของ filter-card */
+.filter-card::-webkit-scrollbar{ width: 10px; }
+.filter-card::-webkit-scrollbar-track{
+  background:#f3f4f6; border-radius:999px;
+}
+.filter-card::-webkit-scrollbar-thumb{
+  background:#d1d5db; border-radius:999px; border:2px solid #f3f4f6;
+}
+.filter-card::-webkit-scrollbar-thumb:hover{ background:#cbd5e1; }
+
+/* มือถือ: ปิด sticky เพราะพื้นที่น้อย */
+@media (max-width: 980px){
+  .filter-panel{
+    position: static;
+    height: auto;
+    overflow: visible;
+  }
+  .filter-card{
+    height: auto;
+    overflow: visible;
+    padding-right: 0;
+  }
 }

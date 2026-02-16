@@ -1,8 +1,7 @@
-// executive/equipment.js (REWRITE)
-// ✅ ลบคอลัมน์ "การใช้งาน" ออกทั้งหมด (ไม่แสดง % / เหลือกี่วัน)
-// - Filters: branch / region / search / category(radio) / status(checkbox)
-// - KPI + Category list + Status list + Groups table
-// - Robust JSON fetch (กัน PHP ส่ง HTML error)
+// executive/equipment.js (REWRITE - Status RADIO)
+// ✅ สถานะอุปกรณ์เป็น Radio Button: ALL / Ready / Rented / Broken
+// ✅ คลิกได้ทั้งแถว + จำค่าที่เลือกไว้ตอน re-render
+// - Filters: branch / region / search / category(radio) / status(radio)
 
 (function () {
   const API_BASE = "/sports_rental_system/executive/api/";
@@ -58,11 +57,7 @@
     `;
   }
 
-  // -----------------------------
-  // Robust JSON GET
-  // -----------------------------
   async function apiGetJSON(file, params = {}) {
-    // Prefer ExecCommon.apiGet if exists
     if (window.ExecCommon && typeof ExecCommon.apiGet === "function") {
       try {
         const res = await ExecCommon.apiGet(file, params);
@@ -75,21 +70,14 @@
     const r = await fetch(url, { credentials: "include" });
     const text = await r.text();
 
-    // HTML error detection
     if (/^\s*</.test(text) || text.includes("<br") || text.includes("<b>")) {
       throw new Error(`API ส่ง HTML แทน JSON: ${file}`);
     }
 
-    try {
-      return JSON.parse(text);
-    } catch {
-      throw new Error(`JSON parse ไม่ได้: ${file}`);
-    }
+    try { return JSON.parse(text); }
+    catch { throw new Error(`JSON parse ไม่ได้: ${file}`); }
   }
 
-  // -----------------------------
-  // UI helpers
-  // -----------------------------
   function statusPill(status) {
     const raw = String(status || "");
     const u = raw.trim().toUpperCase();
@@ -107,36 +95,24 @@
     return `<span class="pill muted">${esc(raw || "-")}</span>`;
   }
 
-  // -----------------------------
-  // Read filters
-  // -----------------------------
-  function readBranch() {
-    return $id("branchSelect") ? ($id("branchSelect").value || "ALL") : "ALL";
-  }
-  function readRegion() {
-    return $id("regionSelect") ? ($id("regionSelect").value || "ALL") : "ALL";
-  }
-  function readSearch() {
-    return ($id("search")?.value || "").trim();
-  }
+  function readBranch() { return $id("branchSelect") ? ($id("branchSelect").value || "ALL") : "ALL"; }
+  function readRegion() { return $id("regionSelect") ? ($id("regionSelect").value || "ALL") : "ALL"; }
+  function readSearch() { return ($id("search")?.value || "").trim(); }
+
   function readCategory() {
     const wrap = $id("catList");
     const picked = wrap?.querySelector('input[name="cat"]:checked');
     return picked ? (picked.value || "ALL") : "ALL";
   }
-  function readStatuses() {
+
+  function readStatus() {
     const wrap = $id("statusList");
-    if (!wrap) return [];
-    return Array.from(wrap.querySelectorAll('input[name="st"]:checked'))
-      .map((x) => x.value)
-      .filter(Boolean);
+    const picked = wrap?.querySelector('input[name="st"]:checked');
+    return picked ? (picked.value || "ALL") : "ALL";
   }
 
   function buildParams() {
-    const params = {
-      branch_id: readBranch(),
-      region: readRegion(),
-    };
+    const params = { branch_id: readBranch(), region: readRegion() };
 
     const q = readSearch();
     if (q) params.search = q;
@@ -144,15 +120,12 @@
     const cat = readCategory();
     if (cat && cat !== "ALL") params.categories = cat;
 
-    const sts = readStatuses();
-    if (sts.length) params.statuses = sts.join(",");
+    const st = readStatus();
+    if (st && st !== "ALL") params.statuses = st;
 
     return params;
   }
 
-  // -----------------------------
-  // Render: meta
-  // -----------------------------
   async function loadMeta() {
     const meta = await apiGetJSON("get_meta.php", {});
     if (!meta || !meta.success) return;
@@ -160,41 +133,29 @@
     const bs = $id("branchSelect");
     if (bs) {
       const keep = bs.value || "ALL";
-      bs.innerHTML =
-        `<option value="ALL">ทั้งหมด</option>` +
-        (meta.branches || []).map((b) => {
-          const id = b.branch_id ?? "";
-          const name = b.name ?? "";
-          return `<option value="${esc(id)}">${esc(id)} • ${esc(name)}</option>`;
-        }).join("");
+      bs.innerHTML = `<option value="ALL">ทั้งหมด</option>` + (meta.branches || []).map((b) =>
+        `<option value="${esc(b.branch_id)}">${esc(b.branch_id)} • ${esc(b.name)}</option>`
+      ).join("");
       bs.value = keep;
     }
 
     const rs = $id("regionSelect");
     if (rs) {
       const keep = rs.value || "ALL";
-      rs.innerHTML =
-        `<option value="ALL">ทั้งหมด</option>` +
-        (meta.regions || []).map((r) =>
-          `<option value="${esc(r.region)}">${esc(r.region)}</option>`
-        ).join("");
+      rs.innerHTML = `<option value="ALL">ทั้งหมด</option>` + (meta.regions || []).map((r) =>
+        `<option value="${esc(r.region)}">${esc(r.region)}</option>`
+      ).join("");
       rs.value = keep;
     }
   }
 
-  // -----------------------------
-  // Render: categories (radio)
-  // -----------------------------
   function renderCategories(categories) {
     const wrap = $id("catList");
     if (!wrap) return;
 
-    const totalAll = Array.isArray(categories)
-      ? categories.reduce((s, c) => s + Number(c.total || 0), 0)
-      : 0;
+    const totalAll = Array.isArray(categories) ? categories.reduce((s, c) => s + Number(c.total || 0), 0) : 0;
 
     const rows = [];
-
     rows.push(`
       <div class="chkRow">
         <label class="chkLeft">
@@ -225,72 +186,71 @@
     }
 
     wrap.innerHTML = rows.join("");
-
-    wrap.querySelectorAll('input[name="cat"]').forEach((el) => {
-      el.addEventListener("change", () => loadOverview());
-    });
+    wrap.querySelectorAll('input[name="cat"]').forEach((el) => el.addEventListener("change", () => loadOverview()));
   }
 
-  // -----------------------------
-  // Render: statuses (checkbox)
-  // -----------------------------
+  // ✅ สถานะเป็น RADIO + มี “ทั้งหมด”
   function renderStatuses(summary) {
     const wrap = $id("statusList");
     if (!wrap) return;
+
+    const keep = readStatus() || "ALL";
 
     const s = summary || {};
     const total = Number(s.total || 0);
     const available = Number(s.available || 0);
     const inUse = Number(s.in_use || 0);
     const broken = Number(s.broken || 0);
-    const maintenance = Number(s.maintenance || 0);
 
     wrap.innerHTML = `
-      <div class="chkRow">
+      <div class="chkRow" data-row="st">
         <label class="chkLeft">
-          <input type="checkbox" name="st" value="Ready" />
+          <input type="radio" name="st" value="ALL" ${keep === "ALL" ? "checked" : ""} />
+          <span>ทั้งหมด</span>
+        </label>
+        <span class="chkCount">(${fmt(total)})</span>
+      </div>
+
+      <div class="chkRow" data-row="st">
+        <label class="chkLeft">
+          <input type="radio" name="st" value="Ready" ${keep === "Ready" ? "checked" : ""} />
           <span>ว่าง</span>
         </label>
         <span class="chkCount">(${fmt(available)})</span>
       </div>
 
-      <div class="chkRow">
+      <div class="chkRow" data-row="st">
         <label class="chkLeft">
-          <input type="checkbox" name="st" value="Rented" />
+          <input type="radio" name="st" value="Rented" ${keep === "Rented" ? "checked" : ""} />
           <span>กำลังใช้งาน</span>
         </label>
         <span class="chkCount">(${fmt(inUse)})</span>
       </div>
 
-      <div class="chkRow">
+      <div class="chkRow" data-row="st">
         <label class="chkLeft">
-          <input type="checkbox" name="st" value="Broken" />
+          <input type="radio" name="st" value="Broken" ${keep === "Broken" ? "checked" : ""} />
           <span>ชำรุด</span>
         </label>
         <span class="chkCount">(${fmt(broken)})</span>
       </div>
 
-      ${maintenance > 0 ? `
-        <div class="chkRow">
-          <label class="chkLeft">
-            <input type="checkbox" name="st" value="Maintenance" />
-            <span>ซ่อมบำรุง</span>
-          </label>
-          <span class="chkCount">(${fmt(maintenance)})</span>
-        </div>
-      ` : ""}
-
       <div class="muted" style="margin-top:8px;font-weight:900;">รวม: ${fmt(total)} ชิ้น</div>
     `;
 
-    wrap.querySelectorAll('input[name="st"]').forEach((el) => {
-      el.addEventListener("change", () => loadOverview());
+    // ✅ คลิกทั้งแถวได้
+    wrap.querySelectorAll(".chkRow[data-row='st']").forEach((row) => {
+      row.addEventListener("click", (e) => {
+        const rb = row.querySelector('input[name="st"]');
+        if (!rb) return;
+        if (e.target && e.target.tagName !== "INPUT") rb.checked = true;
+        loadOverview();
+      });
     });
+
+    wrap.querySelectorAll('input[name="st"]').forEach((el) => el.addEventListener("change", () => loadOverview()));
   }
 
-  // -----------------------------
-  // Render: KPI
-  // -----------------------------
   function renderKPI(summary) {
     const s = summary || {};
     setText("kpiTotal", fmt(s.total || 0));
@@ -299,9 +259,6 @@
     setText("kpiBroken", fmt(s.broken || 0));
   }
 
-  // -----------------------------
-  // Render: groups (✅ ไม่มีคอลัมน์การใช้งาน)
-  // -----------------------------
   function renderGroups(groups) {
     const wrap = $id("groupsWrap");
     if (!wrap) return;
@@ -354,9 +311,6 @@
     }).join("");
   }
 
-  // -----------------------------
-  // Load overview
-  // -----------------------------
   let seq = 0;
   let booted = false;
 
@@ -392,19 +346,13 @@
         const url = API_BASE + "get_equipment_overview.php" + (qs ? "?" + qs : "");
         const r = await fetch(url, { credentials: "include" });
         const t = await r.text();
-        showError(
-          "API ผิดพลาด (ไม่ใช่ JSON หรือ Server Error)",
-          `URL: ${url}\n\n--- response preview ---\n${t.slice(0, 300)}`
-        );
+        showError("API ผิดพลาด (ไม่ใช่ JSON หรือ Server Error)", `URL: ${url}\n\n--- response preview ---\n${t.slice(0, 300)}`);
       } catch {
         showError("โหลดข้อมูลไม่สำเร็จ", e?.message || String(e));
       }
     }
   }
 
-  // -----------------------------
-  // Bind UI
-  // -----------------------------
   function bindUI() {
     $id("btnApply")?.addEventListener("click", () => loadOverview());
     $id("btnReset")?.addEventListener("click", () => location.reload());
@@ -435,20 +383,14 @@
     });
   }
 
-  // -----------------------------
-  // Boot
-  // -----------------------------
   document.addEventListener("DOMContentLoaded", async () => {
     const ok = await (window.ExecCommon?.requireExecutive?.() ?? Promise.resolve(true));
     if (!ok) return;
 
     bindUI();
 
-    try {
-      await loadMeta();
-    } catch (e) {
-      console.error("[equipment] meta error:", e);
-    }
+    try { await loadMeta(); }
+    catch (e) { console.error("[equipment] meta error:", e); }
 
     showLoadingSidebar();
     await loadOverview();
