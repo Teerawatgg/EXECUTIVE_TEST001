@@ -1,9 +1,6 @@
-/* equipment-status.css (NEW) */
+/* equipment-status.css (UPDATED) */
 /* ใช้ร่วมกับ executive.css + users-extend.css */
 
-/* =========================
-   Base helpers
-========================= */
 :root{
   --es-border: #eef0f4;
   --es-muted: #6b7280;
@@ -21,13 +18,44 @@
 .es-spacer{ height: 10px; }
 
 /* =========================
-   Filter: Category checklist
+   ✅ Category Filters: Scrollable box
 ========================= */
 #categoryFilters{
   display: grid;
   gap: 10px;
 }
 
+/* ✅ กล่องให้เลื่อนเมาส์ได้ */
+#categoryFilters.cat-scroll{
+  max-height: 260px;          /* ปรับได้ตามชอบ */
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--es-border);
+  border-radius: 14px;
+  background: #fff;
+}
+
+/* scrollbar (Firefox) */
+#categoryFilters.cat-scroll{
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+/* scrollbar (Chrome/Edge/Safari) */
+#categoryFilters.cat-scroll::-webkit-scrollbar{
+  width: 8px;
+}
+#categoryFilters.cat-scroll::-webkit-scrollbar-thumb{
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+#categoryFilters.cat-scroll::-webkit-scrollbar-track{
+  background: transparent;
+}
+
+/* =========================
+   Filter row (supports RADIO + CHECKBOX)
+========================= */
 .check-row{
   display:flex;
   align-items:center;
@@ -44,14 +72,15 @@
   background: #fafafa;
 }
 
-.check-row input[type="checkbox"]{
+/* ✅ รองรับทั้ง checkbox และ radio */
+.check-row input[type="checkbox"],
+.check-row input[type="radio"]{
   width: 16px;
   height: 16px;
 }
 
 /* =========================
    KPI grid tweak for this page
-   (แก้บั๊ก/จัดสมดุล 6 กล่อง)
 ========================= */
 .kpi-grid.kpi-grid-3{
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -82,7 +111,7 @@
 }
 
 /* =========================
-   Top 5 List (ให้เหมือนหน้าเพื่อน)
+   Top 5 List
 ========================= */
 .topList{
   display: grid;
@@ -192,7 +221,7 @@
   width:100%;
   border-collapse: separate;
   border-spacing: 0;
-  min-width: 760px; /* กันตารางบีบจนแปลก */
+  min-width: 760px;
 }
 
 .es-table thead th{

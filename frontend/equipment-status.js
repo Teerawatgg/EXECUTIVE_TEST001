@@ -1,5 +1,6 @@
-// equipment-status.js (CLEAN API BASE + in_use support)
-// ✅ FIX: lock API_BASE (no auto-detect) => no random 404 me.php
+// equipment-status.js (RADIO category filter - BUGFIX)
+// ✅ ใช้ selectedCategory เป็น state กันการเลือกหลุดตอน render ใหม่
+// ✅ ส่ง categories=... ไป API ได้ถูกต้อง
 
 function $id(id) { return document.getElementById(id); }
 function esc(s) {
@@ -10,9 +11,10 @@ function esc(s) {
 function fmtNum(n){ return Number(n || 0).toLocaleString("th-TH"); }
 function setText(id, v){ const el=$id(id); if(el) el.textContent = v; }
 
-// ✅ ล็อก path API ให้ตรงโปรเจกต์คุณ
-// ถ้าโปรเจกต์เปลี่ยนชื่อโฟลเดอร์ ให้แก้บรรทัดนี้บรรทัดเดียว
 const API_BASE = "/sports_rental_system/executive/api/";
+
+// ✅ STATE: หมวดหมู่ที่เลือก
+let selectedCategory = "ALL";
 
 async function apiGet(file, params) {
   const qs = params ? new URLSearchParams(params).toString() : "";
@@ -27,13 +29,7 @@ async function apiGet(file, params) {
 
 async function requireLogin() {
   const me = await apiGet("me.php");
-  if (me && me.__unauthorized) {
-    const back = encodeURIComponent(location.pathname.split("/").pop() || "equipment-status.html");
-    location.href = "login.html?return=" + back;
-    return false;
-  }
-  // บางระบบ me.php อาจส่ง {success:false} แทน 401
-  if (me && me.success === false) {
+  if (me && (me.__unauthorized || me.success === false)) {
     const back = encodeURIComponent(location.pathname.split("/").pop() || "equipment-status.html");
     location.href = "login.html?return=" + back;
     return false;
@@ -45,21 +41,25 @@ async function requireLogin() {
 function getBranch(){ return $id("branchSelect")?.value || "ALL"; }
 function getSearch(){ return ($id("qSearch")?.value || "").trim(); }
 
-function getSelectedCategories() {
+function syncSelectedCategoryFromDOM() {
   const wrap = $id("categoryFilters");
-  if (!wrap) return [];
-  return Array.from(wrap.querySelectorAll("input[type=checkbox][data-cat]"))
-    .filter(cb => cb.checked)
-    .map(cb => cb.getAttribute("data-cat"))
-    .filter(Boolean);
+  if (!wrap) return;
+  const picked = wrap.querySelector('input[type="radio"][name="category"]:checked');
+  if (!picked) { selectedCategory = "ALL"; return; }
+  selectedCategory = (picked.value || "ALL").trim() || "ALL";
 }
 
 function buildParams() {
   const p = { branch_id: getBranch() };
+
   const s = getSearch();
   if (s) p.search = s;
-  const cats = getSelectedCategories();
-  if (cats.length) p.categories = cats.join(",");
+
+  // ✅ ใช้ state เสมอ
+  if (selectedCategory && selectedCategory !== "ALL") {
+    p.categories = selectedCategory;
+  }
+
   return p;
 }
 
@@ -77,11 +77,11 @@ function renderBranches(meta) {
   sel.value = (Array.from(sel.options).some(o => o.value === keep)) ? keep : "ALL";
 }
 
+/* ---------- Category Filters (RADIO) ---------- */
 function renderCategoryFilters(categories) {
   const wrap = $id("categoryFilters");
   if (!wrap) return;
 
-  const keep = new Set(getSelectedCategories());
   const list = (categories || []).filter(Boolean);
 
   if (!list.length) {
@@ -89,15 +89,24 @@ function renderCategoryFilters(categories) {
     return;
   }
 
-  wrap.innerHTML = list.map(cat => {
-    const checked = keep.size ? keep.has(cat) : true; // default: เลือกทั้งหมด
-    return `
+  // ถ้าหมวดที่เลือกไม่อยู่ใน list (เช่นเปลี่ยนสาขา) -> กลับ ALL
+  if (selectedCategory !== "ALL" && !list.includes(selectedCategory)) {
+    selectedCategory = "ALL";
+  }
+
+  wrap.innerHTML =
+    `
       <label class="check-row" style="font-weight:900;">
-        <input type="checkbox" data-cat="${esc(cat)}" ${checked ? "checked" : ""} />
+        <input type="radio" name="category" value="ALL" ${selectedCategory === "ALL" ? "checked" : ""} />
+        <span>ทั้งหมด</span>
+      </label>
+    ` +
+    list.map(cat => `
+      <label class="check-row" style="font-weight:900;">
+        <input type="radio" name="category" value="${esc(cat)}" ${selectedCategory === cat ? "checked" : ""} />
         <span>${esc(cat)}</span>
       </label>
-    `;
-  }).join("");
+    `).join("");
 }
 
 /* ---------- Cards ---------- */
@@ -253,8 +262,12 @@ async function loadData() {
     return;
   }
 
-  if (Array.isArray(res.categories)) renderCategoryFilters(res.categories);
-  else if (Array.isArray(res.by_category)) renderCategoryFilters(res.by_category.map(x => x.category));
+  const cats = Array.isArray(res.categories)
+    ? res.categories
+    : (Array.isArray(res.by_category) ? res.by_category.map(x => x.category) : []);
+
+  // ✅ render filter ตาม state (ไม่ทำให้ state หลุด)
+  renderCategoryFilters(cats);
 
   renderCards(res.cards);
   renderStackChart(res.by_category || []);
@@ -269,9 +282,19 @@ function debounceLoad(){
 }
 
 function bindEvents() {
-  $id("branchSelect")?.addEventListener("change", loadData);
+  $id("branchSelect")?.addEventListener("change", () => {
+    // เปลี่ยนสาขาแล้วกลับ ALL กันหมวดไม่ตรงสาขา
+    selectedCategory = "ALL";
+    loadData();
+  });
+
   $id("qSearch")?.addEventListener("input", debounceLoad);
-  $id("categoryFilters")?.addEventListener("change", loadData);
+
+  // ✅ radio change: อัปเดต state แล้วโหลด
+  $id("categoryFilters")?.addEventListener("change", () => {
+    syncSelectedCategoryFromDOM();
+    loadData();
+  });
 }
 
 // Boot

@@ -11,7 +11,7 @@
 
   <link rel="stylesheet" href="css/executive.css?v=5" />
   <link rel="stylesheet" href="css/users-extend.css?v=5" />
-  <link rel="stylesheet" href="css/equipment-status.css?v=5" />
+  <link rel="stylesheet" href="css/equipment-status.css?v=6" />
 </head>
 
 <body>
@@ -61,10 +61,12 @@
             </select>
           </div>
 
+          <!-- ✅ หมวดหมู่: สกอลล์ดูรายการได้ -->
           <div class="filter-section">
             <div class="filter-h">หมวดหมู่อุปกรณ์</div>
-            <div id="categoryFilters" style="margin-top:6px;">
-              <div style="color:#6b7280;font-weight:900;">กำลังโหลด...</div>
+
+            <div id="categoryFilters" class="cat-scroll">
+              <div class="muted" style="padding:10px 12px;">กำลังโหลด...</div>
             </div>
           </div>
 
@@ -92,49 +94,14 @@
             </div>
           </div>
 
-          <!-- ✅ FIX: บังคับเป็น 3 คอลัมน์ เพื่อให้ 6 กล่องสมดุล (3x2) -->
-          <div class="kpi-grid" style="grid-template-columns:repeat(3, minmax(0, 1fr));">
-            <div class="kpi">
-              <div>
-                <div class="kpi-label">อุปกรณ์ทั้งหมด</div>
-                <div class="kpi-value" id="cTotal">-</div>
-              </div>
-            </div>
-
-            <div class="kpi">
-              <div>
-                <div class="kpi-label">พร้อมใช้งาน</div>
-                <div class="kpi-value" id="cReady">-</div>
-              </div>
-            </div>
-
-            <div class="kpi">
-              <div>
-                <div class="kpi-label">กำลังใช้งาน</div>
-                <div class="kpi-value" id="cInUse">-</div>
-              </div>
-            </div>
-
-            <div class="kpi">
-              <div>
-                <div class="kpi-label">เสื่อมสภาพ</div>
-                <div class="kpi-value" id="cWorn">-</div>
-              </div>
-            </div>
-
-            <div class="kpi">
-              <div>
-                <div class="kpi-label">ชำรุด</div>
-                <div class="kpi-value" id="cBroken">-</div>
-              </div>
-            </div>
-
-            <div class="kpi">
-              <div>
-                <div class="kpi-label">กำลังซ่อมแซม</div>
-                <div class="kpi-value" id="cMaint">-</div>
-              </div>
-            </div>
+          <!-- ✅ ใช้ class kpi-grid-3 ตาม CSS -->
+          <div class="kpi-grid kpi-grid-3">
+            <div class="kpi"><div><div class="kpi-label">อุปกรณ์ทั้งหมด</div><div class="kpi-value" id="cTotal">-</div></div></div>
+            <div class="kpi"><div><div class="kpi-label">พร้อมใช้งาน</div><div class="kpi-value" id="cReady">-</div></div></div>
+            <div class="kpi"><div><div class="kpi-label">กำลังใช้งาน</div><div class="kpi-value" id="cInUse">-</div></div></div>
+            <div class="kpi"><div><div class="kpi-label">เสื่อมสภาพ</div><div class="kpi-value" id="cWorn">-</div></div></div>
+            <div class="kpi"><div><div class="kpi-label">ชำรุด</div><div class="kpi-value" id="cBroken">-</div></div></div>
+            <div class="kpi"><div><div class="kpi-label">กำลังซ่อมแซม</div><div class="kpi-value" id="cMaint">-</div></div></div>
           </div>
         </section>
 
@@ -158,9 +125,6 @@
               <div style="color:#6b7280;font-weight:900;">กำลังโหลด...</div>
             </div>
 
-            <div class="panel-subtitle" style="margin-top:10px;">
-              หากไม่มีสถานะเสีย/ซ่อม ระบบจะแสดง Top 5 “ถูกใช้งานมากสุด” แทน
-            </div>
           </div>
         </section>
 
@@ -184,29 +148,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="executive-common.js"></script>
-  <script src="equipment-status.js?v=5"></script>
-
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const btn = document.getElementById("btnReset");
-      if (!btn) return;
-
-      btn.addEventListener("click", () => {
-        const q = document.getElementById("qSearch");
-        const b = document.getElementById("branchSelect");
-        if (q) q.value = "";
-        if (b) b.value = "ALL";
-
-        const wrap = document.getElementById("categoryFilters");
-        if (wrap) {
-          wrap.querySelectorAll('input[type="checkbox"][data-cat]').forEach(cb => cb.checked = true);
-          wrap.dispatchEvent(new Event("change", { bubbles: true }));
-        }
-
-        if (q) q.dispatchEvent(new Event("input", { bubbles: true }));
-        if (b) b.dispatchEvent(new Event("change", { bubbles: true }));
-      });
-    });
-  </script>
+  <!-- หมายเหตุ: ใช้ไฟล์ equipment-status.js ที่คุณแก้ไว้แล้ว -->
+  <script src="equipment-status.js?v=999"></script>
 </body>
 </html>
