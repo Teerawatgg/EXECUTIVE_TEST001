@@ -1,8 +1,9 @@
 <?php
 // get_equipment_status_summary.php (FIXED v2)
-// ✅ เพิ่ม bucket: in_use (เช่น Rented / In use / Borrowed / กำลังใช้งาน / ยืมอยู่ / Reserved)
+// ✅ เพิ่ม bucket: in_use
 // ✅ cards + by_category มี in_use
-// ✅ Top5: ถ้าไม่มีปัญหา (worn/broken/maint=0) จะ fallback เป็น Top5 ที่ถูกใช้งานมากสุด (in_use)
+// ✅ Top5 fallback usage
+
 
 require_once __DIR__ . "/_db.php";
 require_once __DIR__ . "/_helpers.php";
@@ -26,14 +27,9 @@ function columnExists($conn, $table, $col) {
   return $res && $res->num_rows > 0;
 }
 
-/**
- * bucket: ready / in_use / worn / broken / maint / other
- */
 function normalizeStatusBucketExpr() {
   return "CASE
     WHEN ei.status IS NULL OR TRIM(ei.status) = '' THEN 'ready'
-
-    -- IN USE (กำลังใช้งาน / rented / borrowed / checked out / reserved)
     WHEN LOWER(TRIM(ei.status)) IN ('rented','in use','in_use','borrowed','checked out','checkout','occupied','using','reserved','booked')
       OR TRIM(ei.status) IN ('กำลังใช้งาน','ใช้งานอยู่','ยืมอยู่','ถูกยืม','ถูกจอง','จองแล้ว','กำลังถูกใช้งาน')
       OR LOWER(TRIM(ei.status)) LIKE '%rent%'
@@ -44,22 +40,16 @@ function normalizeStatusBucketExpr() {
       OR TRIM(ei.status) LIKE '%ยืม%'
       OR TRIM(ei.status) LIKE '%จอง%'
     THEN 'in_use'
-
-    -- READY (พร้อมใช้งาน/ว่าง/available)
     WHEN TRIM(ei.status) IN ('พร้อมใช้งาน','พร้อมใช้','พร้อม','ว่าง')
       OR LOWER(TRIM(ei.status)) IN ('ready','available','free','idle')
       OR TRIM(ei.status) LIKE '%พร้อม%'
       OR TRIM(ei.status) LIKE '%ว่าง%'
     THEN 'ready'
-
-    -- WORN (เสื่อมสภาพ)
     WHEN TRIM(ei.status) IN ('เสื่อมสภาพ','เสื่อม','หมดสภาพ')
       OR LOWER(TRIM(ei.status)) IN ('worn','degraded')
       OR TRIM(ei.status) LIKE '%เสื่อม%'
       OR TRIM(ei.status) LIKE '%หมดสภาพ%'
     THEN 'worn'
-
-    -- BROKEN (ชำรุด)
     WHEN TRIM(ei.status) IN ('ชำรุด','เสีย','พัง','แตก','เสียหาย')
       OR LOWER(TRIM(ei.status)) IN ('broken','damage','damaged')
       OR TRIM(ei.status) LIKE '%ชำรุด%'
@@ -68,21 +58,19 @@ function normalizeStatusBucketExpr() {
       OR TRIM(ei.status) LIKE '%เสียหาย%'
       OR TRIM(ei.status) LIKE '%แตก%'
     THEN 'broken'
-
-    -- MAINT (ซ่อม/บำรุง)
     WHEN TRIM(ei.status) IN ('กำลังซ่อมแซม','ซ่อมแซม','ซ่อม','ซ่อมบำรุง','บำรุงรักษา','ส่งซ่อม')
       OR LOWER(TRIM(ei.status)) IN ('maintenance','repair','repairing')
       OR TRIM(ei.status) LIKE '%ซ่อม%'
       OR TRIM(ei.status) LIKE '%บำรุง%'
       OR TRIM(ei.status) LIKE '%ส่งซ่อม%'
     THEN 'maint'
-
     ELSE 'other'
   END";
 }
 
 try {
   $branch_id = q("branch_id", "ALL");
+  $region    = q("region", "ALL");
   $search    = q("search", "");
   $catsQ     = q("categories", "");
   $categories = array_values(array_filter(array_map("trim", explode(",", $catsQ))));
@@ -92,6 +80,17 @@ try {
 
   if (!tableExists($conn, $emTable) || !tableExists($conn, $eiTable)) {
     throw new Exception("Missing tables: equipment_master/equipment_instances");
+  }
+
+  // ---- geo join (ถ้ามี) ----
+  $joinGeo = "";
+  $hasGeo = tableExists($conn, "branches") && tableExists($conn, "provinces") && tableExists($conn, "region");
+  if ($hasGeo) {
+    $joinGeo = "
+      LEFT JOIN branches br ON br.branch_id = ei.branch_id
+      LEFT JOIN provinces pv ON pv.province_id = br.province_id
+      LEFT JOIN region rg ON rg.region_id = pv.region_id
+    ";
   }
 
   // ---- category expression (กัน schema ไม่ตรง) ----
@@ -137,6 +136,11 @@ try {
     addParam($types, $vals, "s", $branch_id);
   }
 
+  if ($region !== "ALL" && $region !== "" && $hasGeo) {
+    $where .= " AND rg.region_name = ?";
+    addParam($types, $vals, "s", $region);
+  }
+
   if ($search !== "") {
     $where .= " AND (ei.instance_code LIKE ? OR ei.equipment_id LIKE ? OR em.name LIKE ?)";
     $like = "%{$search}%";
@@ -165,6 +169,7 @@ try {
     FROM equipment_instances ei
     JOIN equipment_master em ON em.equipment_id = ei.equipment_id
     {$joinCat}
+    {$joinGeo}
     WHERE {$where}
   ";
   $stCards = safePrepare($conn, $sqlCards);
@@ -172,7 +177,7 @@ try {
   $stCards->execute();
   $cards = fetchOne($stCards);
 
-  // 2) By Category (stack)
+  // 2) By Category
   $sqlByCat = "
     SELECT
       {$catExpr} AS category,
@@ -185,6 +190,7 @@ try {
     FROM equipment_instances ei
     JOIN equipment_master em ON em.equipment_id = ei.equipment_id
     {$joinCat}
+    {$joinGeo}
     WHERE {$where}
     GROUP BY category
     ORDER BY total DESC, category ASC
@@ -199,7 +205,7 @@ try {
     return $r["category"] ?? null;
   }, $by_category)));
 
-  // 3) Top5 (ปัญหา) -> fallback เป็น "ใช้งานมากสุด" ถ้าไม่มีปัญหา
+  // 3) Top5 (issue) -> fallback usage
   $sqlTopIssue = "
     SELECT
       em.equipment_id,
@@ -209,6 +215,7 @@ try {
     FROM equipment_instances ei
     JOIN equipment_master em ON em.equipment_id = ei.equipment_id
     {$joinCat}
+    {$joinGeo}
     WHERE {$where}
     GROUP BY em.equipment_id, em.name, category
     HAVING issue_count > 0
@@ -220,7 +227,7 @@ try {
   $stTop->execute();
   $top5 = fetchAll($stTop);
 
-  $top5_mode = "issue"; // issue | usage
+  $top5_mode = "issue";
   if (!$top5 || count($top5) === 0) {
     $sqlTopUsage = "
       SELECT
@@ -231,6 +238,7 @@ try {
       FROM equipment_instances ei
       JOIN equipment_master em ON em.equipment_id = ei.equipment_id
       {$joinCat}
+      {$joinGeo}
       WHERE {$where}
       GROUP BY em.equipment_id, em.name, category
       HAVING issue_count > 0
@@ -244,7 +252,7 @@ try {
     $top5_mode = "usage";
   }
 
-  // 4) Groups (รายการแยกหมวดหมู่)
+  // 4) Groups
   $sqlList = "
     SELECT
       {$catExpr} AS category,
@@ -257,6 +265,7 @@ try {
     FROM equipment_instances ei
     JOIN equipment_master em ON em.equipment_id = ei.equipment_id
     {$joinCat}
+    {$joinGeo}
     WHERE {$where}
     ORDER BY category ASC, em.name ASC, ei.instance_code ASC
     LIMIT 1500
@@ -283,6 +292,7 @@ try {
     FROM equipment_instances ei
     JOIN equipment_master em ON em.equipment_id = ei.equipment_id
     {$joinCat}
+    {$joinGeo}
     WHERE {$where}
     GROUP BY TRIM(ei.status)
     ORDER BY qty DESC
@@ -313,7 +323,7 @@ try {
         "maint"  => (int)($r["maint"] ?? 0),
       ];
     }, $by_category),
-    "top5_mode" => $top5_mode, // issue / usage
+    "top5_mode" => $top5_mode,
     "top5" => array_map(function($r){
       return [
         "equipment_id" => $r["equipment_id"],
@@ -324,7 +334,6 @@ try {
     }, $top5),
     "groups" => $groups,
     "categories" => $catList,
-
     "items" => array_map(function($r){
       return ["status" => $r["status"], "qty" => (int)($r["qty"] ?? 0)];
     }, $items),

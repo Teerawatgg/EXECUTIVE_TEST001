@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . "/_auth.php";
 require_once __DIR__ . "/_db.php";
 require_once __DIR__ . "/_helpers.php";
 
@@ -12,12 +13,20 @@ function safePrepare($conn, $sql) {
 
 try {
   $branch_id = q("branch_id","ALL");
+  $region    = q("region","ALL");
   $search    = q("search","");
   $statusesQ = q("statuses","");
   $catsQ     = q("categories","");
 
   $statuses   = array_values(array_filter(array_map("trim", explode(",", $statusesQ))));
   $categories = array_values(array_filter(array_map("trim", explode(",", $catsQ))));
+
+  // GEO join (รองรับ filter region)
+  $joinGeo = "
+    LEFT JOIN branches br ON br.branch_id = ei.branch_id
+    LEFT JOIN provinces pv ON pv.province_id = br.province_id
+    LEFT JOIN region rg ON rg.region_id = pv.region_id
+  ";
 
   $where = "1=1";
   $types = "";
@@ -28,15 +37,23 @@ try {
     addParam($types, $vals, "s", $branch_id);
   }
 
+  if ($region !== "ALL" && $region !== "") {
+    $where .= " AND rg.region_name = ?";
+    addParam($types, $vals, "s", $region);
+  }
+
   if ($search !== "") {
     $where .= " AND (ei.instance_code LIKE ? OR em.name LIKE ?)";
     addParam($types, $vals, "s", "%{$search}%");
     addParam($types, $vals, "s", "%{$search}%");
   }
 
+  // categories: รองรับทั้ง "ชื่อหมวด" (equipment-status) และ "category_id" (equipment)
   if (count($categories) > 0) {
-    $in = implode(",", array_fill(0, count($categories), "?"));
-    $where .= " AND COALESCE(TRIM(c.name),'ไม่ระบุหมวดหมู่') IN ($in)";
+    $ph1 = implode(",", array_fill(0, count($categories), "?"));
+    $ph2 = implode(",", array_fill(0, count($categories), "?"));
+    $where .= " AND (em.category_id IN ($ph1) OR COALESCE(TRIM(c.name),'ไม่ระบุหมวดหมู่') IN ($ph2))";
+    foreach ($categories as $cat) addParam($types, $vals, "s", $cat);
     foreach ($categories as $cat) addParam($types, $vals, "s", $cat);
   }
 
@@ -81,6 +98,8 @@ try {
     JOIN equipment_master em ON em.equipment_id = ei.equipment_id
     LEFT JOIN categories c ON c.category_id = em.category_id
 
+    $joinGeo
+
     LEFT JOIN (
       SELECT ml.instance_code
       FROM maintenance_logs ml
@@ -111,7 +130,6 @@ try {
   $rows = fetchAll($st);
   $st->close();
 
-  // return with "status" field expected by JS/table
   $items = array_map(function($r){
     $r["status"] = $r["eff_status"];
     unset($r["eff_status"]);

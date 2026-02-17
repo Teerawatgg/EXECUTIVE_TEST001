@@ -60,9 +60,26 @@ try {
   $branch_id = q("branch_id","ALL");
   $region    = q("region","ALL");
   $region_id = q("region_id","");
-  $academic_year = q("academic_year","ALL");
+
+  // ✅ new: user type
+  $user_type = strtoupper(trim(q("user_type","ALL"))); // STUDENT | GENERAL | ALL
+
+  // ✅ new: single dropdown (ยังรองรับแบบเดิม)
+  $facultySingle = trim(q("faculty",""));
+  $studyYearSingle = trim(q("study_year",""));
+
   $faculties = qcsv("faculties");
   $study_years = qcsv("study_years");
+
+  if($facultySingle !== "" && $facultySingle !== "ALL"){
+    $faculties = [$facultySingle];
+  }
+  if($studyYearSingle !== "" && $studyYearSingle !== "ALL"){
+    $study_years = [$studyYearSingle];
+  }
+
+  // ✅ gender filter from UI
+  $gender_id = q("gender_id", q("gender","ALL"));
 
   // Business rule: paid only + not cancelled
   $needPaidOnly = true;
@@ -83,14 +100,25 @@ try {
 
   $hasBD = hasTable($conn,"booking_details");
 
-  // equipment table naming (บางระบบใช้ equipment_master, บางระบบใช้ equipment)
   $hasEM = hasTable($conn,"equipment_master");
   $hasE  = hasTable($conn,"equipment");
 
-  // review/rating
   $hasReview = hasTable($conn,"review");
   $reviewHasDetail = $hasReview && hasColumn($conn,"review","detail_id");
   $reviewHasRating = $hasReview && hasColumn($conn,"review","rating");
+
+  /* -------------------------
+     Student / General condition (alias cu)
+  ------------------------- */
+  $studentCondParts = [];
+  if (hasTable($conn,"customers") && hasColumn($conn,"customers","customer_type")){
+    $studentCondParts[] = "(LOWER(TRIM(cu.customer_type)) IN ('student','นักศึกษา'))";
+  }
+  if (hasTable($conn,"customers") && hasColumn($conn,"customers","study_year")){
+    $studentCondParts[] = "(cu.study_year IS NOT NULL AND cu.study_year <> 0)";
+  }
+  $studentCond = count($studentCondParts) ? "(".implode(" OR ",$studentCondParts).")" : "0=1";
+  $generalCond = "NOT ($studentCond)";
 
   /* -------------------------
      Build WHERE for bookings (alias b)
@@ -99,13 +127,17 @@ try {
   $where=[];
   $where[] = dateWhere("b.pickup_time", $types, $vals);
 
-  // academic year (พ.ศ.)
-  if($academic_year!=="ALL" && $academic_year!==""){
-    $where[]="(YEAR(b.pickup_time)+543)=?";
-    addParam($types,$vals,"i",(int)$academic_year);
+  // ✅ user type filter
+  if($user_type === "STUDENT"){
+    $where[] = $studentCond;
+  } else if($user_type === "GENERAL"){
+    $where[] = $generalCond;
+    // กันซ้ำ: GENERAL ไม่อนุญาตคณะ/ชั้นปี
+    $faculties = [];
+    $study_years = [];
   }
 
-  // faculty filter
+  // faculty filter (รองรับทั้ง id หรือ name)
   $facultyIsAllNumeric=true;
   foreach($faculties as $f){ if(!preg_match('/^\d+$/',$f)){ $facultyIsAllNumeric=false; break; } }
   if(count($faculties)){
@@ -114,16 +146,29 @@ try {
       $ph[]="?";
       addParam($types,$vals,$facultyIsAllNumeric?"i":"s",$facultyIsAllNumeric?(int)$f:$f);
     }
+    // ถ้าเป็นตัวเลข -> faculty_id, ถ้าไม่ใช่ -> faculty.name
     $where[] = $facultyIsAllNumeric
       ? "cu.faculty_id IN (".implode(",",$ph).")"
       : "f.name IN (".implode(",",$ph).")";
   }
 
-  // study year filter (จากตัวกรอง UI)
+  // study year filter
   if(count($study_years)){
     $ph=[];
     foreach($study_years as $y){ $ph[]="?"; addParam($types,$vals,"i",(int)$y); }
     $where[]="cu.study_year IN (".implode(",",$ph).")";
+  }
+
+  // gender filter
+  if($gender_id !== "ALL" && $gender_id !== ""){
+    if(hasTable($conn,"customers") && hasColumn($conn,"customers","gender_id")){
+      $where[] = "cu.gender_id = ?";
+      addParam($types,$vals,"i",(int)$gender_id);
+    } else if(hasTable($conn,"customers") && hasColumn($conn,"customers","gender")){
+      $where[] = "cu.gender = ?";
+      if(preg_match('/^\d+$/',(string)$gender_id)) addParam($types,$vals,"i",(int)$gender_id);
+      else addParam($types,$vals,"s",(string)$gender_id);
+    }
   }
 
   // region/branch filter
@@ -144,7 +189,7 @@ try {
   }
 
   /* -------------------------
-     JOIN blocks (ใช้ alias เดียวกันทุก query)
+     JOIN blocks (consistent aliases)
   ------------------------- */
   $joinRegion = "";
   if($hasRegionTables && $hasBranches){
@@ -155,7 +200,6 @@ try {
     ";
   }
 
-  // ✅ alias ps/bs สำหรับ bookings
   $joinStatusB = "";
   if($hasPayStatusB){
     $joinStatusB .= " LEFT JOIN payment_status ps ON ps.id = b.payment_status_id ";
@@ -166,9 +210,6 @@ try {
 
   /* -------------------------
      Paid-only + Not cancelled conditions
-     ✅ ยืดหยุ่น:
-       - paid = (ps.code='PAID' from bookings) OR EXISTS(payments with PAID)
-       - not cancelled = bs.code not cancelled (ถ้ามี)
   ------------------------- */
   if($needNotCancelled && $hasBookStatusB){
     $where[] = "bs.code NOT IN ('CANCELLED','CANCELED')";
@@ -205,7 +246,7 @@ try {
   $whereSql = implode(" AND ", $where);
 
   /* -------------------------
-     META (สำหรับ dropdown)
+     META
   ------------------------- */
   $metaYears=[];
   $rsY=$conn->query("SELECT DISTINCT (YEAR(pickup_time)+543) AS y
@@ -247,8 +288,16 @@ try {
   $total_usage=(int)($kpi["total_usage"]??0);
   $active_users=(int)($kpi["active_users"]??0);
 
-  // denominator total_users (ตาม faculty/study_year filter ของลูกค้าอย่างเดียว)
+  // denominator total_users (customers)
   $typesU=""; $valsU=[]; $wU=["1=1"];
+
+  // user type filter for denominator
+  if($user_type === "STUDENT"){
+    $wU[] = str_replace("cu.","",$studentCond);
+  } else if($user_type === "GENERAL"){
+    $wU[] = str_replace("cu.","",$generalCond);
+  }
+
   if(count($faculties)){
     $ph=[];
     foreach($faculties as $f){
@@ -259,11 +308,24 @@ try {
       ? "faculty_id IN (".implode(",",$ph).")"
       : "faculty_id IN (SELECT id FROM faculty WHERE name IN (".implode(",",$ph)."))";
   }
+
   if(count($study_years)){
     $ph=[];
     foreach($study_years as $y){ $ph[]="?"; addParam($typesU,$valsU,"i",(int)$y); }
     $wU[]="study_year IN (".implode(",",$ph).")";
   }
+
+  if($gender_id !== "ALL" && $gender_id !== ""){
+    if(hasTable($conn,"customers") && hasColumn($conn,"customers","gender_id")){
+      $wU[] = "gender_id = ?";
+      addParam($typesU,$valsU,"i",(int)$gender_id);
+    } else if(hasTable($conn,"customers") && hasColumn($conn,"customers","gender")){
+      $wU[] = "gender = ?";
+      if(preg_match('/^\d+$/',(string)$gender_id)) addParam($typesU,$valsU,"i",(int)$gender_id);
+      else addParam($typesU,$valsU,"s",(string)$gender_id);
+    }
+  }
+
   $st=$conn->prepare("SELECT COUNT(*) AS total_users FROM customers WHERE ".implode(" AND ",$wU));
   stmtBindDynamic($st,$typesU,$valsU);
   $st->execute();
@@ -319,7 +381,7 @@ try {
   $st->close();
 
   /* -------------------------
-     member_tier_summary (ใช้ customers.member_level ของคุณ)
+     member_tier_summary
   ------------------------- */
   $tierExpr = hasColumn($conn,"customers","member_level")
     ? "COALESCE(NULLIF(TRIM(cu.member_level),''),'ไม่ระบุ')"
@@ -367,133 +429,23 @@ try {
   ], $tierRows);
 
   /* -------------------------
-     ✅ Student condition (ให้กว้างขึ้นกัน schema ต่างกัน)
-  ------------------------- */
-  $studentCondParts = [];
-  if (hasColumn($conn,"customers","customer_type")){
-    $studentCondParts[] = "(LOWER(TRIM(cu.customer_type)) IN ('student','นักศึกษา'))";
-  }
-  if (hasColumn($conn,"customers","is_student")){
-    $studentCondParts[] = "(cu.is_student = 1)";
-  }
-  if (hasColumn($conn,"customers","study_year")){
-    $studentCondParts[] = "(cu.study_year IS NOT NULL AND cu.study_year <> 0)";
-  }
-  if (hasColumn($conn,"customers","faculty_id")){
-    $studentCondParts[] = "(cu.faculty_id IS NOT NULL)";
-  }
-  $studentCond = count($studentCondParts) ? "(".implode(" OR ",$studentCondParts).")" : "0=1";
-
-  /* -------------------------
-     ✅ student_coupon_top (คูปองยอดนิยมในกลุ่มนักศึกษา)
-     รองรับหลาย schema:
-     - bookings.coupon_code
-     - bookings.coupon_id + coupons/coupon table
-  ------------------------- */
-  $student_coupon_top = [];
-
-  // Case A: bookings.coupon_code
-  if (hasColumn($conn,"bookings","coupon_code")) {
-    $st = $conn->prepare("
-      SELECT
-        TRIM(b.coupon_code) AS coupon_code,
-        COUNT(*) AS cnt
-      FROM bookings b
-      INNER JOIN customers cu ON cu.customer_id=b.customer_id
-      LEFT JOIN faculty f ON f.id=cu.faculty_id
-      $joinRegion
-      $joinStatusB
-      WHERE $whereSql
-        AND $studentCond
-        AND b.coupon_code IS NOT NULL
-        AND TRIM(b.coupon_code) <> ''
-      GROUP BY TRIM(b.coupon_code)
-      ORDER BY cnt DESC
-      LIMIT 5
-    ");
-    stmtBindDynamic($st, $types, $vals);
-    $st->execute();
-    $rows = fetchAll($st);
-    $st->close();
-
-    $student_coupon_top = array_map(fn($r)=>[
-      "coupon_code" => $r["coupon_code"],
-      "count" => (int)($r["cnt"] ?? 0)
-    ], $rows);
-  }
-
-  // Case B: bookings.coupon_id + coupons table (ถ้าไม่มี coupon_code หรือไม่มีข้อมูล)
-  if (!count($student_coupon_top) && hasColumn($conn,"bookings","coupon_id")) {
-    $couponTable = null;
-
-    if (hasTable($conn,"coupons")) $couponTable = "coupons";
-    else if (hasTable($conn,"coupon")) $couponTable = "coupon";
-
-    if ($couponTable) {
-      $codeCol = hasColumn($conn,$couponTable,"coupon_code") ? "c.coupon_code"
-              : (hasColumn($conn,$couponTable,"code") ? "c.code"
-              : (hasColumn($conn,$couponTable,"coupon_name") ? "c.coupon_name"
-              : (hasColumn($conn,$couponTable,"name") ? "c.name" : null)));
-
-      $idCol = hasColumn($conn,$couponTable,"coupon_id") ? "c.coupon_id"
-            : (hasColumn($conn,$couponTable,"id") ? "c.id" : null);
-
-      if ($codeCol && $idCol) {
-        $st = $conn->prepare("
-          SELECT
-            TRIM($codeCol) AS coupon_code,
-            COUNT(*) AS cnt
-          FROM bookings b
-          INNER JOIN customers cu ON cu.customer_id=b.customer_id
-          LEFT JOIN faculty f ON f.id=cu.faculty_id
-          $joinRegion
-          $joinStatusB
-          LEFT JOIN $couponTable c ON $idCol = b.coupon_id
-          WHERE $whereSql
-            AND $studentCond
-            AND b.coupon_id IS NOT NULL
-            AND $codeCol IS NOT NULL
-            AND TRIM($codeCol) <> ''
-          GROUP BY TRIM($codeCol)
-          ORDER BY cnt DESC
-          LIMIT 5
-        ");
-        stmtBindDynamic($st, $types, $vals);
-        $st->execute();
-        $rows = fetchAll($st);
-        $st->close();
-
-        $student_coupon_top = array_map(fn($r)=>[
-          "coupon_code" => $r["coupon_code"],
-          "count" => (int)($r["cnt"] ?? 0)
-        ], $rows);
-      }
-    }
-  }
-
-  /* -------------------------
-     Equipment joins (รองรับ equipment_master หรือ equipment)
+     Equipment joins
   ------------------------- */
   $equipJoin = "";
   $equipName = "";
-  if(hasTable($conn,"booking_details")){
-    if($hasEM){
-      $equipJoin = "LEFT JOIN equipment_master em ON em.equipment_id = d.equipment_id";
-      $equipName = "em.name";
-    } else if($hasE){
-      $equipJoin = "LEFT JOIN equipment em ON em.equipment_id = d.equipment_id";
-      $equipName = hasColumn($conn,"equipment","equipment_name") ? "em.equipment_name" : "em.name";
-    }
+  if($hasEM){
+    $equipJoin = "LEFT JOIN equipment_master em ON em.equipment_id = d.equipment_id";
+    $equipName = "em.name";
+  } else if($hasE){
+    $equipJoin = "LEFT JOIN equipment em ON em.equipment_id = d.equipment_id";
+    $equipName = hasColumn($conn,"equipment","equipment_name") ? "em.equipment_name" : "em.name";
   }
 
   /* -------------------------
-     top_equipment + student_top_equipment
+     top_equipment
   ------------------------- */
   $top_equipment = [];
-  $student_top_equipment = [];
-
   if($hasBD && $equipJoin !== "" && $equipName !== ""){
-    // overall top 5
     $st=$conn->prepare("
       SELECT $equipName AS name, COALESCE(SUM(d.quantity),0) AS cnt
       FROM booking_details d
@@ -514,29 +466,6 @@ try {
     $rows=fetchAll($st);
     $st->close();
     $top_equipment = array_map(fn($r)=>["name"=>$r["name"],"count"=>(int)$r["cnt"]], $rows);
-
-    // student top 5
-    $st=$conn->prepare("
-      SELECT $equipName AS name, COALESCE(SUM(d.quantity),0) AS cnt
-      FROM booking_details d
-      INNER JOIN bookings b ON b.booking_id = d.booking_id
-      INNER JOIN customers cu ON cu.customer_id=b.customer_id
-      LEFT JOIN faculty f ON f.id=cu.faculty_id
-      $joinRegion
-      $joinStatusB
-      $equipJoin
-      WHERE $whereSql
-        AND $studentCond
-        AND $equipName IS NOT NULL AND TRIM($equipName)<>'' 
-      GROUP BY $equipName
-      ORDER BY cnt DESC
-      LIMIT 5
-    ");
-    stmtBindDynamic($st,$types,$vals);
-    $st->execute();
-    $rows=fetchAll($st);
-    $st->close();
-    $student_top_equipment = array_map(fn($r)=>["name"=>$r["name"],"count"=>(int)$r["cnt"]], $rows);
   }
 
   /* -------------------------
@@ -567,7 +496,6 @@ try {
   $st->execute();
   $peakRows=fetchAll($st);
   $st->close();
-
   $peak_time = array_map(fn($r)=>["label"=>$r["tbin"],"count"=>(int)$r["cnt"]], $peakRows);
 
   $st=$conn->prepare("
@@ -598,7 +526,6 @@ try {
      payment_method_summary
   ------------------------- */
   $payment_method_summary = [];
-
   if($hasPaymentMethods){
     $aCol = hasColumn($conn,"payments","amount") ? "pay.amount"
           : (hasColumn($conn,"payments","net_amount") ? "pay.net_amount" : "0");
@@ -718,7 +645,7 @@ try {
   echo json_encode([
     "success"=>true,
     "meta"=>[
-      "academic_years"=>$metaYears,
+      "academic_years"=>$metaYears, // (คงไว้เผื่อใช้งานอนาคต)
       "faculties"=>$metaFac,
       "study_years"=>$metaSY,
     ],
@@ -733,17 +660,13 @@ try {
     "by_study_year"=>array_map(fn($r)=>["study_year"=>(int)$r["study_year"],"count"=>(int)$r["cnt"]],$bySY),
 
     "top_equipment"=>$top_equipment,
-    "student_top_equipment"=>$student_top_equipment,
 
     "peak_time"=>$peak_time,
     "daily_usage"=>$daily_usage,
 
     "member_tier_summary"=>$member_tier_summary,
-
-    // ✅ เพิ่มให้หน้า users ใช้ได้จริง
-    "student_coupon_top"=>$student_coupon_top,
-
     "payment_method_summary"=>$payment_method_summary,
+
     "equipment_ratings"=>$equipment_ratings
   ], JSON_UNESCAPED_UNICODE);
 

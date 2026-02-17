@@ -1,9 +1,10 @@
 /* ==========================
-   Executive Dashboard - index.js (FINAL v5)
+   Executive Dashboard - index.js (API ใหม่ตามโครงสร้าง)
+   ✅ API_BASE = "../api/"
    ✅ channelMode = radio (ALL / WALKIN / ONLINE)
-   ✅ Channel Daily: Y axis integer only
-   ✅ Channel Daily: show avg_online / avg_walkin from API
-   ✅ Equipment usage chart: PIE + outside % + custom list (like sample #2)
+   ✅ Custom date
+   ✅ Channel Daily: y integer
+   ✅ Pie outside % + legend list
    ✅ Prevent chart vanish on bfcache/back/tab
 ========================== */
 
@@ -15,7 +16,7 @@ let chartChannelDaily = null;
 let chartBranch = null;
 let chartPayPie = null;
 
-const API_BASE = "/sports_rental_system/executive/api/";
+const API_BASE = "../api/";
 
 function $(sel) { return document.querySelector(sel); }
 function $id(id) { return document.getElementById(id); }
@@ -32,13 +33,13 @@ function fmtMoney(n) {
 }
 function safeText(id, text) {
   const el = $id(id);
-  if (el) el.textContent = text;
+  if (el) el.textContent = text ?? "";
 }
 
 async function apiGet(file, params) {
   const qs = params ? new URLSearchParams(params).toString() : "";
   const url = API_BASE + file + (qs ? "?" + qs : "");
-  const res = await fetch(url, { credentials: "include" });
+  const res = await fetch(url, { credentials: "include", cache: "no-store" });
   if (!res.ok) return null;
   try { return await res.json(); } catch { return null; }
 }
@@ -357,12 +358,8 @@ async function loadTrend(params) {
 }
 
 /* ==========================
-   Equipment usage PIE (like sample #2)
-   - show outside percentages
-   - custom list under the chart
+   Equipment usage PIE
 ========================== */
-
-// ✅ Plugin: draw % outside the pie slices
 const pieOutsidePercentPlugin = {
   id: "pieOutsidePercentPlugin",
   afterDatasetsDraw(chart) {
@@ -385,7 +382,7 @@ const pieOutsidePercentPlugin = {
       if (!val) return;
 
       const pct = (val * 100) / total;
-      if (pct < 3) return; // hide very small slices
+      if (pct < 3) return;
 
       const angle = (arc.startAngle + arc.endAngle) / 2;
       const r = arc.outerRadius + 22;
@@ -468,13 +465,7 @@ function drawEquipmentPie(payload) {
 
   chartEquipmentPie = new Chart(ctx, {
     type: "pie",
-    data: {
-      labels,
-      datasets: [{
-        data: values
-        // ไม่กำหนดสีเอง ปล่อย Chart.js จัด palette
-      }]
-    },
+    data: { labels, datasets: [{ data: values }] },
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -495,14 +486,12 @@ function drawEquipmentPie(payload) {
     plugins: [pieOutsidePercentPlugin]
   });
 
-  // ✅ custom list under chart (like sample #2)
   if (legend) {
     const bg = chartEquipmentPie.data.datasets[0].backgroundColor || [];
     legend.innerHTML = items.map((it, i) => {
       const v = Number(it.count || 0);
       const pct = total ? (v * 100 / total) : 0;
       const color = bg[i] || "#111827";
-
       return `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 2px;">
           <div style="display:flex;align-items:center;gap:10px;min-width:0;">
@@ -531,7 +520,7 @@ async function loadTopEquipment(params) {
 }
 
 /* ==========================
-   Channel Daily (Y integer)
+   Channel Daily
 ========================== */
 function drawChannelDaily(payload) {
   const c = $id("chartChannelDaily");
@@ -570,12 +559,7 @@ function drawChannelDaily(payload) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: { legend: { position: "bottom" } },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: { precision: 0, stepSize: 1 } // ✅ integer ticks
-        }
-      }
+      scales: { y: { beginAtZero: true, ticks: { precision: 0, stepSize: 1 } } }
     }
   });
 
@@ -591,7 +575,7 @@ async function loadChannelDaily(params) {
 }
 
 /* ==========================
-   Legacy (if exists)
+   Legacy (optional)
 ========================== */
 function drawLegacyBranchIfExists(rows) {
   const canvas = $id("chartBranch");
@@ -610,11 +594,7 @@ function drawLegacyBranchIfExists(rows) {
         { label: "Online", data: rows.map(r => Number(r.online || 0)) }
       ]
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: { y: { beginAtZero: true, ticks: { precision: 0, stepSize: 1 } } }
-    }
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0, stepSize: 1 } } } }
   });
 }
 

@@ -1,31 +1,34 @@
+/* users.js (filters: userType + dropdown faculty/studyYear, disable when GENERAL) */
+
 function $id(id) { return document.getElementById(id); }
 function fmtNum(n){ return Number(n||0).toLocaleString("th-TH"); }
 
 const API_BASE = "/sports_rental_system/executive/api/";
-const API_FILE  = "get_users_dashboard.php";
+const API_FILE = "get_users_dashboard.php";
 const META_FILE = "get_meta.php";
 
 let chartFaculty = null;
 let chartStudyYear = null;
 let chartPeak = null;
+
 let mode = "peak";
 let _token = 0;
 
+/* -------------------- helpers -------------------- */
 function destroyChart(ch){ try{ ch?.destroy(); }catch{} return null; }
 
-/* ✅ Robust JSON (กัน PHP ส่ง HTML / warning) */
 async function apiGet(file, params = {}) {
   const qs = new URLSearchParams(params).toString();
   const url = API_BASE + file + (qs ? "?" + qs : "");
   const res = await fetch(url, { credentials: "include" });
   const text = await res.text();
 
-  // ถ้า server ส่ง HTML มา แปลว่า error
+  // กันกรณี PHP ส่ง warning/HTML ออกมา
   if (/^\s*</.test(text) || text.includes("<br") || text.includes("<b>")) {
-    return { success:false, error:"API returned HTML (server error)", raw:text.slice(0, 500), url };
+    return { success:false, error:"API returned HTML (server error)", raw:text.slice(0, 600), url };
   }
   try { return JSON.parse(text); }
-  catch { return { success:false, error:"Invalid JSON", raw:text.slice(0, 500), url }; }
+  catch { return { success:false, error:"Invalid JSON", raw:text.slice(0, 600), url }; }
 }
 
 async function requireExecutive(){
@@ -37,19 +40,43 @@ async function requireExecutive(){
   return true;
 }
 
-function getRange(){
-  return document.querySelector('input[name="range"]:checked')?.value || "all";
-}
 function getRadioValue(name){
   return document.querySelector(`input[name="${name}"]:checked`)?.value || "ALL";
 }
+function getRange(){ return getRadioValue("range") || "all"; }
+
 function getSelectText(id){
   const el = $id(id);
   if (!el) return "ทั้งหมด";
   return el.options?.[el.selectedIndex]?.textContent?.trim() || "ทั้งหมด";
 }
 
-/* ============ Branch Primary ============ */
+/* -------------------- userType: disable faculty/studyYear when GENERAL -------------------- */
+function getUserType(){
+  return getRadioValue("userType") || "ALL";
+}
+function syncUserTypeUI(){
+  const type = getUserType();
+  const fac = $id("facultySelect");
+  const sy  = $id("studyYearSelect");
+  if (!fac || !sy) return;
+
+  if (type === "GENERAL") {
+    fac.value = "ALL";
+    sy.value = "ALL";
+    fac.disabled = true;
+    sy.disabled = true;
+    fac.classList.add("disabled");
+    sy.classList.add("disabled");
+  } else {
+    fac.disabled = false;
+    sy.disabled = false;
+    fac.classList.remove("disabled");
+    sy.classList.remove("disabled");
+  }
+}
+
+/* -------------------- Branch primary (สาขาเลือกแล้วปิดภูมิภาค) -------------------- */
 function syncBranchPrimaryUI(){
   const bs = $id("branchSelect");
   const rs = $id("regionSelect");
@@ -66,7 +93,7 @@ function syncBranchPrimaryUI(){
   }
 }
 
-/* ============ Custom Date Box ============ */
+/* -------------------- custom date box -------------------- */
 function setupCustomDateBox(){
   const box = $id("customDateBox");
   if (!box) return;
@@ -76,15 +103,14 @@ function setupCustomDateBox(){
   sync();
 }
 
-/* ============ Params ============ */
+/* -------------------- params -------------------- */
 function getParams(){
   const p = {};
 
   const branchVal = ($id("branchSelect")?.value ?? "ALL").trim();
   const regionVal = ($id("regionSelect")?.value ?? "ALL").trim();
-  const ayVal     = ($id("academicYear")?.value ?? "ALL").trim();
 
-  // Branch Primary
+  // Branch primary
   if (branchVal !== "ALL" && branchVal !== "") {
     p.branch_id = branchVal;
   } else {
@@ -94,8 +120,23 @@ function getParams(){
     }
   }
 
-  if (ayVal !== "ALL" && ayVal !== "") p.academic_year = ayVal;
+  // ✅ ประเภทผู้ใช้
+  const userType = getUserType();
+  if (userType !== "ALL") p.user_type = userType; // STUDENT | GENERAL
 
+  // ✅ เพศ
+  const gender = getRadioValue("gender");
+  if (gender !== "ALL" && gender !== "") p.gender_id = String(gender);
+
+  // ✅ คณะ/ชั้นปี (dropdown)
+  const facVal = ($id("facultySelect")?.value ?? "ALL").trim();
+  const syVal  = ($id("studyYearSelect")?.value ?? "ALL").trim();
+
+  // ถ้าเป็น GENERAL จะถูก syncUserTypeUI บังคับเป็น ALL แล้ว
+  if (facVal !== "ALL" && facVal !== "") p.faculty = facVal;
+  if (syVal !== "ALL" && syVal !== "") p.study_year = syVal;
+
+  // ช่วงเวลา
   const range = getRange();
   p.range = range;
 
@@ -106,15 +147,10 @@ function getParams(){
     if (to) p.to = to;
   }
 
-  const faculty = getRadioValue("faculty");
-  const sy      = getRadioValue("studyYear");
-  if (faculty !== "ALL") p.faculties = String(faculty);
-  if (sy !== "ALL")      p.study_years = String(sy);
-
   return p;
 }
 
-/* ============ Chips ============ */
+/* -------------------- chips -------------------- */
 function rangeText(){
   const r = getRange();
   if (r === "all") return "ทั้งหมด";
@@ -133,20 +169,30 @@ function customDateText(){
   if (to) return `ถึง ${to}`;
   return "";
 }
+function userTypeText(){
+  const t = getUserType();
+  if (t === "STUDENT") return "นักศึกษา";
+  if (t === "GENERAL") return "บุคคลทั่วไป";
+  return "ทั้งหมด";
+}
+function genderText(){
+  const g = getRadioValue("gender");
+  return (g==="1"?"ชาย":(g==="2"?"หญิง":(g==="3"?"อื่นๆ":"ทั้งหมด")));
+}
 function renderFilterChips(){
   const wrap = $id("filterChips");
   if (!wrap) return;
 
-  const ay = $id("academicYear")?.value || "ALL";
   const cd = customDateText();
 
   const chips = [
+    {k:"ประเภทผู้ใช้", v:userTypeText(), cls:"gray"},
     {k:"ภูมิภาค", v:getSelectText("regionSelect"), cls:"gray"},
     {k:"สาขา", v:getSelectText("branchSelect"), cls:"gray"},
-    {k:"ปี", v:(ay === "ALL" ? "ทั้งหมด" : ay), cls:"gray"},
+    {k:"เพศ", v:genderText(), cls:"gray"},
     {k:"ช่วงเวลา", v: cd ? `${rangeText()} (${cd})` : rangeText(), cls:"orange"},
-    {k:"คณะ", v:(getRadioValue("faculty")==="ALL" ? "ทั้งหมด" : getRadioValue("faculty")), cls:"gray"},
-    {k:"ชั้นปี", v:(getRadioValue("studyYear")==="ALL" ? "ทั้งหมด" : "ปี "+getRadioValue("studyYear")), cls:"gray"},
+    {k:"คณะ", v:getSelectText("facultySelect"), cls:"gray"},
+    {k:"ชั้นปี", v:getSelectText("studyYearSelect"), cls:"gray"},
   ];
 
   wrap.innerHTML = chips.map(c => `
@@ -157,7 +203,7 @@ function renderFilterChips(){
   `).join("");
 }
 
-/* ============ Charts ============ */
+/* -------------------- charts -------------------- */
 function drawBar(canvasId, labels, data){
   const c = $id(canvasId);
   if (!c || !window.Chart) return null;
@@ -177,7 +223,7 @@ function drawBar(canvasId, labels, data){
   });
 }
 
-/* ============ KPI ============ */
+/* -------------------- render blocks -------------------- */
 function setKPI(kpi){
   $id("kpiTotalUsage") && ($id("kpiTotalUsage").textContent = fmtNum(kpi.total_usage || 0));
   $id("kpiTopFacultyName") && ($id("kpiTopFacultyName").textContent = kpi?.top_faculty?.name || "-");
@@ -188,7 +234,6 @@ function setKPI(kpi){
   $id("kpiUsageBar") && ($id("kpiUsageBar").style.width = Math.max(0, Math.min(100, rate)) + "%");
 }
 
-/* ============ Member tier ============ */
 function renderMemberTier(res){
   const tb = $id("memberTierTbody");
   if (!tb) return;
@@ -198,7 +243,6 @@ function renderMemberTier(res){
     tb.innerHTML = `<tr><td colspan="3" style="color:#6b7280;font-weight:900;">ไม่พบข้อมูล</td></tr>`;
     return;
   }
-
   tb.innerHTML = rows.map(r => `
     <tr>
       <td>${r.tier_name || "-"}</td>
@@ -208,12 +252,10 @@ function renderMemberTier(res){
   `).join("");
 }
 
-/* ============ ✅ Student coupon top (FIX) ============ */
 function renderStudentCouponTop(res){
   const wrap = $id("studentCouponTop");
   if (!wrap) return;
 
-  // ✅ รองรับทั้ง array ตรง ๆ และกรณีห่อเป็น object
   let rows = [];
   if (Array.isArray(res?.student_coupon_top)) rows = res.student_coupon_top;
   else if (Array.isArray(res?.student_coupon_top?.items)) rows = res.student_coupon_top.items;
@@ -240,19 +282,8 @@ function renderStudentCouponTop(res){
   }).join("");
 }
 
-/* ============ Payment method ============ */
 function pickPaymentLabel(r){
-  const raw =
-    r?.method_name ??
-    r?.method ??
-    r?.channel_name ??
-    r?.channel ??
-    r?.payment_method_name ??
-    r?.payment_method ??
-    r?.method_code ??
-    r?.code ??
-    "";
-
+  const raw = r?.method_name ?? r?.method ?? r?.channel_name ?? r?.channel ?? r?.payment_method_name ?? r?.payment_method ?? r?.method_code ?? r?.code ?? "";
   const v = String(raw).trim();
   if (!v || v === "-" || v.toLowerCase() === "null" || v.toLowerCase() === "undefined") {
     const code = String(r?.method_code || r?.code || "").toUpperCase().trim();
@@ -290,14 +321,12 @@ function renderPaymentMethod(res){
   `).join("");
 }
 
-/* ============ ✅ Equipment ratings (FIX ให้ตรง API) ============ */
 function renderEquipmentRatings(res){
   const totalEl = $id("rvTotal");
   const avgEl   = $id("rvAvg");
   const tb      = $id("equipmentRatingTbody");
   if (!totalEl || !avgEl || !tb) return;
 
-  // API ของคุณส่งมาเป็น object: equipment_ratings { total_reviews, avg_rating_overall, items[] }
   const pack = res?.equipment_ratings || null;
 
   const totalReviews = Number(pack?.total_reviews ?? 0);
@@ -329,7 +358,6 @@ function renderEquipmentRatings(res){
   }).join("");
 }
 
-/* ============ Top equipment ============ */
 function renderTopEquipment(items){
   const wrap = $id("topEquipmentList");
   if (!wrap) return;
@@ -352,42 +380,7 @@ function renderTopEquipment(items){
   }).join("");
 }
 
-/* ============ Radio list renderer ============ */
-function renderRadioList({wrapId, name, items, getValue, getLabel, getCount}){
-  const wrap = $id(wrapId);
-  if (!wrap) return;
-
-  const safeItems = Array.isArray(items) ? items : [];
-  const current = getRadioValue(name);
-
-  const allCount = safeItems.reduce((s,it)=> s + Number(getCount?.(it) ?? 0), 0);
-  const allChecked = (current === "ALL");
-
-  const html = [];
-  html.push(`
-    <label class="item-radio">
-      <input type="radio" name="${name}" value="ALL" ${allChecked ? "checked":""}/>
-      <span>ทั้งหมด</span>
-      <small>${fmtNum(allCount)} ครั้ง</small>
-    </label>
-  `);
-
-  safeItems.forEach(it=>{
-    const v = String(getValue(it));
-    const checked = (current === v);
-    html.push(`
-      <label class="item-radio">
-        <input type="radio" name="${name}" value="${v}" ${checked ? "checked":""}/>
-        <span>${getLabel(it)}</span>
-        <small>${fmtNum(getCount?.(it) ?? 0)} ครั้ง</small>
-      </label>
-    `);
-  });
-
-  wrap.innerHTML = html.join("");
-}
-
-/* ============ Meta dropdowns ============ */
+/* -------------------- meta (regions/branches) -------------------- */
 async function loadMeta(){
   const meta = await apiGet(META_FILE, {});
   if (!meta || !meta.success) return;
@@ -415,14 +408,48 @@ async function loadMeta(){
   syncBranchPrimaryUI();
 }
 
-/* ============ Mode ============ */
+/* -------------------- mode -------------------- */
 function setMode(next){
   mode = next;
   $id("btnDaily")?.classList.toggle("active", mode==="daily");
   $id("btnPeak")?.classList.toggle("active", mode==="peak");
 }
 
-/* ============ Load main ============ */
+/* -------------------- fill dropdowns from API meta -------------------- */
+function fillFacultyDropdown(metaFac){
+  const sel = $id("facultySelect");
+  if (!sel) return;
+
+  const keep = sel.value || "ALL";
+  sel.innerHTML = `<option value="ALL">ทั้งหมด</option>`;
+
+  (Array.isArray(metaFac) ? metaFac : []).forEach(f=>{
+    const id = f.id ?? f.faculty_id ?? f.value ?? "";
+    const name = f.name ?? f.faculty_name ?? f.label ?? "";
+    if (id === "" || name === "") return;
+    sel.insertAdjacentHTML("beforeend", `<option value="${id}">${name}</option>`);
+  });
+
+  sel.value = keep;
+}
+
+function fillStudyYearDropdown(metaSY){
+  const sel = $id("studyYearSelect");
+  if (!sel) return;
+
+  const keep = sel.value || "ALL";
+  sel.innerHTML = `<option value="ALL">ทั้งหมด</option>`;
+
+  (Array.isArray(metaSY) ? metaSY : []).forEach(y=>{
+    const yy = String(y ?? "").trim();
+    if (!yy) return;
+    sel.insertAdjacentHTML("beforeend", `<option value="${yy}">ปี ${yy}</option>`);
+  });
+
+  sel.value = keep;
+}
+
+/* -------------------- main load -------------------- */
 async function load(first){
   const t = ++_token;
 
@@ -432,7 +459,6 @@ async function load(first){
   if (t !== _token) return;
 
   if (!res || !res.success) {
-    // ✅ แสดง error ให้ดีขึ้น (จะได้รู้ว่าเป็น 500/HTML/JSON พัง)
     console.warn("[users] API error:", res);
 
     setKPI({});
@@ -445,42 +471,17 @@ async function load(first){
     chartFaculty = destroyChart(chartFaculty);
     chartStudyYear = destroyChart(chartStudyYear);
     chartPeak = destroyChart(chartPeak);
-
-    $id("facultyList") && ($id("facultyList").innerHTML = `<div style="color:#6b7280;font-weight:900;">ไม่พบข้อมูลคณะ</div>`);
-    $id("studyYearList") && ($id("studyYearList").innerHTML = `<div style="color:#6b7280;font-weight:900;">ไม่พบข้อมูลชั้นปี</div>`);
     return;
   }
 
+  // ✅ เติม dropdown ครั้งแรกจาก meta ของ API นี้
   if (first) {
-    const years = Array.isArray(res?.meta?.academic_years) ? res.meta.academic_years : [];
-    const sel = $id("academicYear");
-    if (sel && years.length) {
-      const keep = sel.value || "ALL";
-      sel.innerHTML = `<option value="ALL">ทั้งหมด</option>` + years.map(y=>`<option value="${y}">${y}</option>`).join("");
-      sel.value = keep;
-    }
+    fillFacultyDropdown(res?.meta?.faculties || []);
+    fillStudyYearDropdown(res?.meta?.study_years || []);
+    syncUserTypeUI();
   }
 
-  const facRows = Array.isArray(res.by_faculty) ? res.by_faculty : [];
-  renderRadioList({
-    wrapId:"facultyList",
-    name:"faculty",
-    items: facRows,
-    getValue: (it)=> it.faculty ?? "-",
-    getLabel: (it)=> it.faculty ?? "-",
-    getCount: (it)=> Number(it.count||0)
-  });
-
-  const syRows = Array.isArray(res.by_study_year) ? res.by_study_year : [];
-  renderRadioList({
-    wrapId:"studyYearList",
-    name:"studyYear",
-    items: syRows,
-    getValue: (it)=> it.study_year ?? "-",
-    getLabel: (it)=> "ปี " + (it.study_year ?? "-"),
-    getCount: (it)=> Number(it.count||0)
-  });
-
+  // KPI + tables
   setKPI(res.kpi || {});
   renderMemberTier(res);
   renderStudentCouponTop(res);
@@ -488,9 +489,13 @@ async function load(first){
   renderEquipmentRatings(res);
   renderTopEquipment(res.top_equipment || []);
 
+  // charts
   chartFaculty = destroyChart(chartFaculty);
   chartStudyYear = destroyChart(chartStudyYear);
   chartPeak = destroyChart(chartPeak);
+
+  const facRows = Array.isArray(res.by_faculty) ? res.by_faculty : [];
+  const syRows  = Array.isArray(res.by_study_year) ? res.by_study_year : [];
 
   chartFaculty = drawBar("chartFaculty",
     facRows.map(r=>r.faculty||"-"),
@@ -517,24 +522,34 @@ async function load(first){
   renderFilterChips();
 }
 
-/* ============ Bind UI ============ */
+/* -------------------- bind UI -------------------- */
 function bindUI(){
   $id("branchSelect")?.addEventListener("change", ()=>{ syncBranchPrimaryUI(); load(false); });
   $id("regionSelect")?.addEventListener("change", ()=>load(false));
-  $id("academicYear")?.addEventListener("change", ()=>load(false));
 
+  $id("facultySelect")?.addEventListener("change", ()=>load(false));
+  $id("studyYearSelect")?.addEventListener("change", ()=>load(false));
+
+  // เวลา
   document.querySelectorAll('input[name="range"]').forEach(r=>{
     r.addEventListener("change", ()=>load(false));
   });
-
   ["fromDate","toDate"].forEach(id=>{
     $id(id)?.addEventListener("change", ()=>load(false));
   });
 
+  // radio: userType + gender
   document.addEventListener("change", (e)=>{
-    const t = e.target;
-    if (!t) return;
-    if (t.name === "faculty" || t.name === "studyYear") load(false);
+    const el = e.target;
+    if (!el) return;
+
+    if (el.name === "userType") {
+      syncUserTypeUI();
+      load(false);
+    }
+    if (el.name === "gender") {
+      load(false);
+    }
   });
 
   $id("btnDaily")?.addEventListener("click", ()=>{ setMode("daily"); load(false); });
@@ -543,27 +558,35 @@ function bindUI(){
   $id("btnApply")?.addEventListener("click", ()=>load(false));
 
   $id("btnReset")?.addEventListener("click", ()=>{
+    // reset branch/region
     $id("branchSelect") && ($id("branchSelect").value = "ALL");
     $id("regionSelect") && ($id("regionSelect").value = "ALL");
-    $id("academicYear") && ($id("academicYear").value = "ALL");
 
+    // reset userType
+    const utAll = document.querySelector('input[name="userType"][value="ALL"]');
+    if (utAll) utAll.checked = true;
+
+    // reset gender
+    const gAll = document.querySelector('input[name="gender"][value="ALL"]');
+    if (gAll) gAll.checked = true;
+
+    // reset range
     document.querySelectorAll('input[name="range"]').forEach(r=>{ r.checked = (r.value === "all"); });
-
     $id("fromDate") && ($id("fromDate").value = "");
     $id("toDate") && ($id("toDate").value = "");
 
-    const fAll = document.querySelector('input[name="faculty"][value="ALL"]');
-    if (fAll) fAll.checked = true;
-    const sAll = document.querySelector('input[name="studyYear"][value="ALL"]');
-    if (sAll) sAll.checked = true;
+    // reset dropdown
+    $id("facultySelect") && ($id("facultySelect").value = "ALL");
+    $id("studyYearSelect") && ($id("studyYearSelect").value = "ALL");
 
     syncBranchPrimaryUI();
+    syncUserTypeUI();
     setupCustomDateBox();
     load(false);
   });
 }
 
-/* ============ Init ============ */
+/* -------------------- init -------------------- */
 document.addEventListener("DOMContentLoaded", async ()=>{
   const ok = await requireExecutive();
   if (!ok) return;
@@ -572,6 +595,7 @@ document.addEventListener("DOMContentLoaded", async ()=>{
   setupCustomDateBox();
   bindUI();
   syncBranchPrimaryUI();
+  syncUserTypeUI();
   setMode("peak");
   await load(true);
 });

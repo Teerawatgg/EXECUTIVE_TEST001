@@ -32,7 +32,6 @@
 
     .dash{display:grid;grid-template-columns:repeat(12,1fr);gap:14px;}
     .card{border:1px solid #eef0f4;background:#fff;border-radius:14px;padding:14px;box-shadow:0 10px 26px rgba(17,24,39,.06);display:flex;gap:12px;align-items:flex-start;min-height:88px;}
-    .card .ic{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:#f3f4f6;font-size:18px;flex:0 0 auto;}
     .card .t{font-weight:900;color:#111827;font-size:12px;}
     .card .v{font-weight:900;color:#111827;font-size:18px;margin-top:4px;}
     .card .s{font-weight:900;color:#6b7280;font-size:11px;margin-top:2px;}
@@ -51,13 +50,8 @@
     .seg button{border:1px solid #e5e7eb;background:#fff;padding:6px 10px;border-radius:999px;font-weight:900;cursor:pointer;font-size:12px;color:#111827;}
     .seg button.active{border-color:#22c55e;background:#dcfce7;color:#166534;}
 
-    .list-radio{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
-    .item-radio{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #eef0f4;border-radius:12px;background:#fff;cursor:pointer;font-weight:900;position:relative;}
-    .item-radio:hover{background:#f9fafb;}
-    .item-radio input{position:absolute;opacity:0;pointer-events:none;}
-    .item-radio small{margin-left:auto;color:#6b7280;font-weight:900;}
-    .item-radio:has(input:checked){border-color:#f97316;background:#fff7ed;color:#9a3412;}
-
+    .radio-stack{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+    .select.disabled{opacity:.6;pointer-events:none;}
     .tableWrap{overflow:auto;}
     table.mini{width:100%;border-collapse:separate;border-spacing:0;font-size:12px;}
     table.mini th,table.mini td{padding:10px 10px;border-bottom:1px solid #eef0f4;white-space:nowrap;}
@@ -101,13 +95,17 @@
         <div class="filter-card">
           <div class="filter-title">ตัวกรอง</div>
 
+          <!-- 1) ประเภทผู้ใช้ -->
           <div class="filter-section">
-            <div class="filter-h">สาขา</div>
-            <select id="branchSelect" class="select">
-              <option value="ALL">ทั้งหมด</option>
-            </select>
+            <div class="filter-h">ประเภทผู้ใช้</div>
+            <div class="radio-stack">
+              <label class="radio-row"><input type="radio" name="userType" value="ALL" checked> <span>ทั้งหมด</span></label>
+              <label class="radio-row"><input type="radio" name="userType" value="STUDENT"> <span>นักศึกษา</span></label>
+              <label class="radio-row"><input type="radio" name="userType" value="GENERAL"> <span>บุคคลทั่วไป</span></label>
+            </div>
           </div>
 
+          <!-- 2) ภูมิภาค -->
           <div class="filter-section">
             <div class="filter-h">ภูมิภาค</div>
             <select id="regionSelect" class="select">
@@ -115,16 +113,28 @@
             </select>
           </div>
 
+          <!-- 3) สาขา -->
           <div class="filter-section">
-            <div class="filter-h">ปีการศึกษา</div>
-            <select id="academicYear" class="select">
+            <div class="filter-h">สาขา</div>
+            <select id="branchSelect" class="select">
               <option value="ALL">ทั้งหมด</option>
             </select>
           </div>
 
+          <!-- 4) เพศ -->
+          <div class="filter-section">
+            <div class="filter-h">เพศ</div>
+            <div class="radio-stack">
+              <label class="radio-row"><input type="radio" name="gender" value="ALL" checked> <span>ทั้งหมด</span></label>
+              <label class="radio-row"><input type="radio" name="gender" value="1"> <span>ชาย</span></label>
+              <label class="radio-row"><input type="radio" name="gender" value="2"> <span>หญิง</span></label>
+              <label class="radio-row"><input type="radio" name="gender" value="3"> <span>อื่นๆ</span></label>
+            </div>
+          </div>
+
+          <!-- 5) ช่วงเวลา -->
           <div class="filter-section">
             <div class="filter-h">ช่วงเวลา</div>
-
             <label class="radio-row"><input type="radio" name="range" value="all" checked> <span>ทั้งหมด</span></label>
             <label class="radio-row"><input type="radio" name="range" value="today"> <span>วันนี้</span></label>
             <label class="radio-row"><input type="radio" name="range" value="7d"> <span>7 วันที่ผ่านมา</span></label>
@@ -143,18 +153,20 @@
             </div>
           </div>
 
+          <!-- 6) คณะ -->
           <div class="filter-section">
             <div class="filter-h">คณะ</div>
-            <div id="facultyList" class="list-radio">
-              <div class="muted-placeholder">กำลังโหลดรายการคณะ...</div>
-            </div>
+            <select id="facultySelect" class="select">
+              <option value="ALL">ทั้งหมด</option>
+            </select>
           </div>
 
+          <!-- 7) ชั้นปี -->
           <div class="filter-section">
             <div class="filter-h">ชั้นปี</div>
-            <div id="studyYearList" class="list-radio">
-              <div class="muted-placeholder">กำลังโหลดรายการชั้นปี...</div>
-            </div>
+            <select id="studyYearSelect" class="select">
+              <option value="ALL">ทั้งหมด</option>
+            </select>
           </div>
 
           <div class="filter-actions">
@@ -239,8 +251,8 @@
               </div>
             </div>
 
-            <!-- Coupon top -->
-            <div class="panel-mini" style="grid-column: span 6;">
+            <!-- ✅ Coupon top (ซ่อนได้เมื่อ GENERAL) -->
+            <div class="panel-mini" id="panelStudentCoupon" style="grid-column: span 6;">
               <h4>คูปองยอดนิยมในกลุ่มนักศึกษา</h4>
               <div class="muted">คูปองใดถูกนำมาใช้งานมากที่สุด (เฉพาะกลุ่มนักศึกษา)</div>
               <div id="studentCouponTop" class="topList"></div>
@@ -266,7 +278,7 @@
               </div>
             </div>
 
-            <!-- ✅ Ratings by equipment (แทนรีวิวเดิม) -->
+            <!-- Ratings by equipment -->
             <div class="panel-mini" style="grid-column: span 6;">
               <h4>การให้คะแนนอุปกรณ์จากผู้ใช้</h4>
               <div class="muted">ผู้ใช้ให้คะแนนอุปกรณ์ ดั้งนี้ (เฉลี่ย/จำนวน/คิดเป็น %)</div>
@@ -302,9 +314,7 @@
             <!-- Peak/daily -->
             <div class="panel-mini" style="grid-column: span 6;">
               <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
-                <div>
-                  <h4 style="margin:0;">ช่วงเวลาการยืมสูงสุด</h4>
-                </div>
+                <div><h4 style="margin:0;">ช่วงเวลาการยืมสูงสุด</h4></div>
                 <div class="seg">
                   <button id="btnDaily" type="button">รายวัน</button>
                   <button id="btnPeak" type="button" class="active">ช่วงเวลาใช้งาน</button>

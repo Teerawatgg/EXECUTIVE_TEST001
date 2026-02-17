@@ -9,7 +9,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
 
-  <!-- ✅ ใช้ executive.css ตามที่คุณปรับ -->
   <link rel="stylesheet" href="css/executive.css" />
 </head>
 
@@ -94,7 +93,6 @@
             </select>
           </div>
 
-          <!-- ✅ เปลี่ยนเป็น RADIO: ทั้งหมด / Walk-in / Online -->
           <div class="filter-section">
             <div class="filter-h">ช่องทางการจอง</div>
 
@@ -269,17 +267,14 @@
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-  <!-- Auth Guard -->
+  <!-- ✅ Auth Guard (API ใหม่แบบ relative) -->
   <script>
     (async function requireLogin() {
       try {
-        const res = await fetch("/sports_rental_system/executive/api/me.php", {
-          credentials: "include",
-          cache: "no-store"
-        });
+        const res = await fetch("../api/me.php", { credentials: "include", cache: "no-store" });
         const me = await res.json();
         if (!me || !me.success) location.replace("login.html");
-      } catch (e) {
+      } catch {
         location.replace("login.html");
       }
     })();
@@ -287,18 +282,5 @@
 
   <script src="executive-common.js"></script>
   <script src="index.js"></script>
-
-  <!-- Toggle custom date box -->
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const box = document.getElementById("customDateBox");
-      const sync = () => {
-        const r = document.querySelector("input[name='range']:checked");
-        box.style.display = (r && r.value === "custom") ? "block" : "none";
-      };
-      document.querySelectorAll("input[name='range']").forEach(el => el.addEventListener("change", sync));
-      sync();
-    });
-  </script>
 </body>
 </html>
